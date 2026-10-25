@@ -1,0 +1,12 @@
+{
+  "name": "storyboard-vn",
+  "version": "1.0.0",
+  "description": "The Glass Meridian: a branching visual novel written in Ren'Py 8 with a zero-dependency browser runtime and static story graph verifier.",
+  "main": "engine.js",
+  "scripts": {
+    "test": "node --test",
+    "build:art": "node scripts/build-art.js",
+    "build:bundle": "node scripts/build-bundle.js"
+  },
+  "license": "MIT"
+}

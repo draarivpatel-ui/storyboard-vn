@@ -1,0 +1,8 @@
+node_modules/
+.DS_Store
+*.log
+log.txt
+game/cache/
+game/saves/
+game/*.rpyc
+game/*.rpyb

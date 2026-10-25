@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Glass Meridian: a Ren'Py visual novel with a story graph verifier</title>
+  <meta name="description" content="Play The Glass Meridian, a visual novel written in real Ren'Py 8 script, in your browser. A built-in parser audits every label, branch and ending of the script.">
+  <meta name="theme-color" content="#14181D">
+  <meta property="og:title" content="The Glass Meridian">
+  <meta property="og:description" content="A visual novel in six scenes and four endings, plus a browser Ren'Py parser that proves every ending is reachable.">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-screen="menu">
+  <a class="skip-link" href="#main">Skip to the game</a>
+
+  <svg class="sprite" width="0" height="0" aria-hidden="true" focusable="false">
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="M9 7 4 12l5 5M4 12h10a6 6 0 0 1 0 12"/></symbol>
+    <symbol id="i-history" viewBox="0 0 24 24"><path d="M5 6h14M5 12h14M5 18h9"/></symbol>
+    <symbol id="i-auto" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m10 8.5 6 3.5-6 3.5z"/></symbol>
+    <symbol id="i-skip" viewBox="0 0 24 24"><path d="m5 6 7 6-7 6zM13 6l7 6-7 6z"/></symbol>
+    <symbol id="i-save" viewBox="0 0 24 24"><path d="M5 4h11l3 3v13H5zM8 4v5h7V4M8 20v-6h8v6"/></symbol>
+    <symbol id="i-load" viewBox="0 0 24 24"><path d="M3 7h7l2 2h9v10H3zM12 12v5m0 0-2.5-2.5M12 17l2.5-2.5"/></symbol>
+    <symbol id="i-map" viewBox="0 0 24 24"><circle cx="6" cy="5" r="2.2"/><circle cx="18" cy="12" r="2.2"/><circle cx="6" cy="19" r="2.2"/><path d="M8 6l8 5M8 18l8-5"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 11 12 4l8 7M6 10v10h12V10M10 20v-6h4v6"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="11" height="12" rx="1.5"/><path d="M5 16V5a1 1 0 0 1 1-1h9"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7z"/></symbol>
+    <symbol id="i-reset" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 3-6.2M4 4v4h4"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h15m-5-5 5 5-5 5"/></symbol>
+    <symbol id="i-lens" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><path d="M12 3v18M3 12h18"/></symbol>
+  </svg>
+
+  <main id="main">
+    <section id="screen-menu" class="screen screen-menu" aria-labelledby="menu-title">
+      <div class="menu-art" aria-hidden="true">
+        <img class="menu-art-bg" src="game/images/bg_dawn.svg" alt="" width="1920" height="1080">
+        <svg class="menu-art-lens" viewBox="0 0 200 200" focusable="false">
+          <circle cx="100" cy="100" r="92" class="ring ring-a"/>
+          <circle cx="100" cy="100" r="70" class="ring ring-b"/>
+          <circle cx="100" cy="100" r="48" class="ring ring-c"/>
+          <path d="M100 8v184M8 100h184" class="cross"/>
+        </svg>
+      </div>
+      <div class="menu-panel">
+        <h1 id="menu-title" class="menu-title">The Glass Meridian</h1>
+        <p class="menu-lede">A lens that has to be set once a century, a storm a day early, and three keepers who each remember how you treated them.</p>
+        <nav aria-label="Main menu">
+          <ol class="menu-index">
+            <li>
+              <button type="button" class="menu-item" data-action="new">
+                <span class="menu-idx">01</span>
+                <span class="menu-label">New Expedition</span>
+                <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg>
+              </button>
+            </li>
+            <li>
+              <button type="button" class="menu-item" data-action="continue">
+                <span class="menu-idx">02</span>
+                <span class="menu-label">Continue Slot</span>
+                <span class="menu-hint" id="continue-hint">no saves yet</span>
+              </button>
+            </li>
+            <li>
+              <button type="button" class="menu-item" data-action="gallery">
+                <span class="menu-idx">03</span>
+                <span class="menu-label">Ending Gallery</span>
+                <span class="menu-hint" id="gallery-hint">0 of 4 found</span>
+              </button>
+            </li>
+            <li>
+              <button type="button" class="menu-item" data-action="inspector">
+                <span class="menu-idx">04</span>
+                <span class="menu-label">Script &amp; DAG Inspector</span>
+                <span class="menu-hint">audit the .rpy</span>
+              </button>
+            </li>
+          </ol>
+        </nav>
+        <p class="menu-foot">This page parses and plays the real <code>game/script.rpy</code>. The same repository opens as a Ren'Py 8 project on desktop. Made for Hack Club Storyboard.</p>
+      </div>
+    </section>
+
+    <section id="screen-play" class="screen screen-play" aria-label="Visual novel stage" hidden>
+      <div class="play-shell">
+        <div class="stage-wrap" id="stage-wrap">
+          <div id="stage" class="stage" data-scene="" data-tone="day">
+            <div class="stage-bg" id="stage-bg"></div>
+            <div class="stage-ambient" aria-hidden="true"></div>
+            <div class="stage-sprites" id="stage-sprites"></div>
+            <div class="stage-vignette" aria-hidden="true"></div>
+            <div class="stage-fade" id="stage-fade" aria-hidden="true"></div>
+          </div>
+          <div class="choices" id="choices" role="group" aria-label="Choices" hidden></div>
+          <div class="dialogue" id="dialogue">
+            <div class="speaker" id="speaker" hidden></div>
+            <p class="dialogue-text" id="dialogue-text" aria-hidden="true"></p>
+            <p class="sr-only" id="dialogue-live" aria-live="polite"></p>
+            <button type="button" class="advance-cue" id="advance-cue" aria-label="Continue">
+              <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg>
+            </button>
+          </div>
+          <div class="endcard" id="endcard" role="dialog" aria-modal="false" aria-labelledby="endcard-title" hidden>
+            <p class="endcard-count" id="endcard-count"></p>
+            <h2 class="endcard-title" id="endcard-title"></h2>
+            <p class="endcard-state" id="endcard-state"></p>
+            <div class="endcard-actions">
+              <button type="button" class="btn btn-primary" data-act="again">Play again</button>
+              <button type="button" class="btn" data-act="gallery">Ending Gallery</button>
+              <button type="button" class="btn" data-act="menu">Main Menu</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="dock" role="toolbar" aria-label="Game controls">
+          <button type="button" class="dock-btn" data-act="back" title="Step back (Left arrow)" aria-label="Step back">
+            <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-back"/></svg><span class="dock-label">Back</span>
+          </button>
+          <button type="button" class="dock-btn" data-act="history" title="Dialogue backlog (H)" aria-label="Dialogue backlog">
+            <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-history"/></svg><span class="dock-label">History</span>
+          </button>
+          <button type="button" class="dock-btn" data-act="auto" aria-pressed="false" title="Auto advance (A)" aria-label="Auto advance">
+            <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-auto"/></svg><span class="dock-label">Auto</span>
+          </button>
+          <button type="button" class="dock-btn" data-act="skip" aria-pressed="false" title="Skip seen text (S). Hold Shift to skip unseen text too." aria-label="Skip">
+            <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-skip"/></svg><span class="dock-label" id="skip-label">Skip seen</span>
+          </button>
+          <button type="button" class="dock-btn" data-act="save" title="Save to a slot" aria-label="Save">
+            <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-save"/></svg><span class="dock-label">Save</span>
+          </button>
+          <button type="button" class="dock-btn" data-act="load" title="Load a slot" aria-label="Load">
+            <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-load"/></svg><span class="dock-label">Load</span>
+          </button>
+          <button type="button" class="dock-btn" data-act="map" aria-pressed="false" title="Narrative map (M)" aria-label="Narrative map">
+            <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-map"/></svg><span class="dock-label">Map</span>
+          </button>
+          <button type="button" class="dock-btn" data-act="settings" title="Settings" aria-label="Settings">
+            <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-gear"/></svg><span class="dock-label">Settings</span>
+          </button>
+          <button type="button" class="dock-btn" data-act="menu" title="Main menu (Escape)" aria-label="Main menu">
+            <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-home"/></svg><span class="dock-label">Menu</span>
+          </button>
+        </div>
+      </div>
+
+      <aside class="drawer" id="map-drawer" aria-labelledby="map-title" hidden>
+        <div class="drawer-head">
+          <h2 id="map-title" class="drawer-title">Narrative map</h2>
+          <button type="button" class="icon-btn" data-act="map" aria-label="Close map">
+            <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-close"/></svg>
+          </button>
+        </div>
+        <dl class="gauges" id="gauges"></dl>
+        <div class="map-scroll" id="map-scroll" tabindex="0" role="group" aria-label="Story graph, scrollable"></div>
+        <ul class="legend" id="legend" aria-label="Map legend"></ul>
+      </aside>
+    </section>
+
+    <section id="screen-gallery" class="screen screen-gallery" aria-labelledby="gallery-title" hidden>
+      <header class="bar">
+        <button type="button" class="btn btn-quiet" data-action="menu">
+          <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-home"/></svg><span>Main Menu</span>
+        </button>
+        <h2 id="gallery-title" class="bar-title">Ending Gallery</h2>
+        <p class="bar-note" id="gallery-count">0 of 4 found</p>
+      </header>
+      <ol class="ending-list" id="ending-list"></ol>
+    </section>
+
+    <section id="screen-inspector" class="screen screen-inspector" aria-labelledby="inspector-title" hidden>
+      <header class="bar">
+        <button type="button" class="btn btn-quiet" data-action="menu">
+          <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-home"/></svg><span>Main Menu</span>
+        </button>
+        <h2 id="inspector-title" class="bar-title">Script &amp; DAG Inspector</h2>
+        <div class="bar-actions">
+          <button type="button" class="btn" id="btn-reset">
+            <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-reset"/></svg><span>Reset script</span>
+          </button>
+          <button type="button" class="btn" id="btn-copy">
+            <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-copy"/></svg><span>Copy report</span>
+          </button>
+          <button type="button" class="btn btn-primary" id="btn-play-script">
+            <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-play"/></svg><span>Play this script</span>
+          </button>
+        </div>
+      </header>
+      <div class="inspector-grid">
+        <div class="editor-pane">
+          <label class="pane-label" for="src-editor">Ren'Py source, editable. The audit reruns as you type.</label>
+          <textarea id="src-editor" class="editor" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off"></textarea>
+        </div>
+        <div class="report-pane">
+          <div class="verdict" id="verdict" role="status" data-state="idle"></div>
+          <div class="tabs" role="tablist" aria-label="Report views">
+            <button type="button" class="tab" role="tab" id="tab-audit" aria-controls="panel-audit" aria-selected="true" data-tab="audit">Audit</button>
+            <button type="button" class="tab" role="tab" id="tab-graph" aria-controls="panel-graph" aria-selected="false" data-tab="graph" tabindex="-1">Graph</button>
+            <button type="button" class="tab" role="tab" id="tab-endings" aria-controls="panel-endings" aria-selected="false" data-tab="endings" tabindex="-1">Endings</button>
+          </div>
+          <div class="panel" id="panel-audit" role="tabpanel" aria-labelledby="tab-audit" tabindex="0">
+            <dl class="stats" id="stats"></dl>
+            <ul class="issues" id="issues"></ul>
+          </div>
+          <div class="panel" id="panel-graph" role="tabpanel" aria-labelledby="tab-graph" tabindex="0" hidden>
+            <div class="map-scroll" id="graph-scroll"></div>
+          </div>
+          <div class="panel" id="panel-endings" role="tabpanel" aria-labelledby="tab-endings" tabindex="0" hidden>
+            <ol class="route-list" id="route-list"></ol>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <dialog class="dlg" id="dlg-history" aria-labelledby="dlg-history-title">
+    <div class="dlg-head">
+      <h2 id="dlg-history-title" class="dlg-title">Dialogue backlog</h2>
+      <button type="button" class="icon-btn" data-close aria-label="Close backlog">
+        <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-close"/></svg>
+      </button>
+    </div>
+    <ol class="backlog" id="backlog"></ol>
+  </dialog>
+
+  <dialog class="dlg" id="dlg-slots" aria-labelledby="dlg-slots-title">
+    <div class="dlg-head">
+      <h2 id="dlg-slots-title" class="dlg-title">Save slots</h2>
+      <button type="button" class="icon-btn" data-close aria-label="Close slots">
+        <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-close"/></svg>
+      </button>
+    </div>
+    <ol class="slots" id="slots"></ol>
+    <p class="dlg-note" id="slots-note">Saves live in this browser only.</p>
+  </dialog>
+
+  <dialog class="dlg" id="dlg-settings" aria-labelledby="dlg-settings-title">
+    <div class="dlg-head">
+      <h2 id="dlg-settings-title" class="dlg-title">Settings</h2>
+      <button type="button" class="icon-btn" data-close aria-label="Close settings">
+        <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-close"/></svg>
+      </button>
+    </div>
+    <div class="settings">
+      <label class="field" for="set-speed">
+        <span class="field-label">Text speed</span>
+        <input type="range" id="set-speed" min="0" max="120" step="5" value="45">
+        <output id="set-speed-out" for="set-speed">45 characters per second</output>
+      </label>
+      <label class="check" for="set-locked">
+        <input type="checkbox" id="set-locked" checked>
+        <span>Show locked choices, with the condition that unlocks them</span>
+      </label>
+      <label class="check" for="set-parallax">
+        <input type="checkbox" id="set-parallax" checked>
+        <span>Parallax on pointer movement</span>
+      </label>
+      <button type="button" class="btn" id="btn-wipe">Erase saves, seen text and found endings</button>
+      <h3 class="dlg-sub">Keys</h3>
+      <dl class="keys">
+        <dt>Space, Enter, Right arrow</dt><dd>Advance</dd>
+        <dt>Left arrow, Backspace</dt><dd>Step back</dd>
+        <dt>1 to 9</dt><dd>Pick a choice</dd>
+        <dt>H, M, A, S</dt><dd>Backlog, map, auto, skip</dd>
+        <dt>Escape</dt><dd>Close a panel, or return to the menu</dd>
+      </dl>
+    </div>
+  </dialog>
+
+  <noscript>
+    <p class="noscript">This game runs a Ren'Py script parser in JavaScript. Turn on JavaScript to play, or open the <code>game</code> folder in Ren'Py 8.</p>
+  </noscript>
+
+  <script src="engine.js"></script>
+  <script src="assets/script-bundle.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

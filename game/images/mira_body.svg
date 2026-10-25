@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="520" height="900" viewBox="0 0 520 900">
+<defs>
+</defs>
+<path d="M 150 270 Q 140 140 260 130 Q 380 140 370 270 L 380 440 Q 340 470 300 440 L 220 440 Q 180 470 140 440 Z" fill="#2B1D17"/>
+<rect x="226" y="372" width="68" height="100" fill="#7C4C34"/>
+<path d="M 40 900 L 56 560 Q 70 480 190 452 L 330 452 Q 450 480 464 560 L 480 900 Z" fill="#1E5E63"/>
+<path d="M 190 452 Q 260 520 330 452 L 306 440 Q 260 480 214 440 Z" fill="#F5F2EA"/>
+<path d="M 260 520 L 260 900" fill="none" stroke="#123F43" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="260" cy="590" r="9" fill="#B4532A"/>
+<circle cx="260" cy="680" r="9" fill="#B4532A"/>
+<circle cx="260" cy="770" r="9" fill="#B4532A"/>
+<path d="M 40 900 L 56 560 L 120 600 L 110 900 Z" fill="#17474B" opacity="0.7"/>
+<path d="M 480 900 L 464 560 L 400 600 L 410 900 Z" fill="#17474B" opacity="0.7"/>
+<path d="M 150 470 Q 260 560 370 470 L 350 520 Q 260 600 170 520 Z" fill="#F5F2EA"/>
+<path d="M 196 500 Q 260 560 324 500" fill="none" stroke="#B4532A" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M 226 430 Q 260 472 294 430 L 294 380 L 226 380 Z" fill="#9A6244"/>
+</svg>

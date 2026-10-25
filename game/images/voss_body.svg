@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="520" height="900" viewBox="0 0 520 900">
+<defs>
+</defs>
+<path d="M 156 270 Q 150 150 260 138 Q 370 150 364 270 L 356 340 L 164 340 Z" fill="#E4E0D8"/>
+<rect x="226" y="372" width="68" height="100" fill="#A87B58"/>
+<path d="M 40 900 L 56 560 Q 70 480 190 452 L 330 452 Q 450 480 464 560 L 480 900 Z" fill="#1B1E24"/>
+<path d="M 190 452 Q 260 520 330 452 L 306 440 Q 260 480 214 440 Z" fill="#F5F2EA"/>
+<path d="M 40 900 L 56 560 Q 70 480 190 452 L 330 452 Q 450 480 464 560 L 480 900 Z" fill="#1B1E24"/>
+<path d="M 190 452 L 260 700 L 330 452 L 300 446 L 260 560 L 220 446 Z" fill="#2B2F36"/>
+<path d="M 226 470 L 260 520 L 294 470 L 260 450 Z" fill="#F5F2EA"/>
+<circle cx="260" cy="600" r="8" fill="#B8893E"/>
+<circle cx="260" cy="680" r="8" fill="#B8893E"/>
+<circle cx="260" cy="760" r="8" fill="#B8893E"/>
+<path d="M 330 520 Q 400 600 340 700" fill="none" stroke="#B8893E" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="340" cy="704" r="12" fill="#B8893E"/>
+<path d="M 226 430 Q 260 472 294 430 L 294 380 L 226 380 Z" fill="#C99A72"/>
+<path d="M 236 462 L 260 494 L 284 462 L 260 474 Z" fill="#B4532A"/>
+</svg>
