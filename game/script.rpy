@@ -1,6 +1,6 @@
 ## The Glass Meridian
 ##
-## A visual novel in six scenes and four endings, written for Hack Club Storyboard.
+## A visual novel in six scenes and four endings, an AI-assisted reference build (not a Hack Club Storyboard entry).
 ##
 ## This file is read by two programs. Desktop Ren'Py 8 runs it as a normal game.
 ## The browser runtime in this repository (engine.js) parses the same file at

@@ -274,7 +274,7 @@ screen main_menu():
         style "main_menu_title_box"
         text "The Glass Meridian" style "main_menu_title"
         text "A visual novel in six scenes and four endings" style "main_menu_subtitle"
-        text "Hack Club Storyboard" style "main_menu_subtitle"
+        text "An AI-assisted reference build" style "main_menu_subtitle"
 
 style main_menu_frame is empty
 style main_menu_title_box is vbox
