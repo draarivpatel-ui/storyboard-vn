@@ -449,11 +449,32 @@ code {
   flex-direction: column;
   align-items: center;
   width: 100%;
+  transition: padding-right 0.35s var(--ease);
+}
+
+/* With the map open on a wide screen the stage slides left instead of sitting under the drawer. */
+@media (min-width: 1000px) {
+  .screen-play:has(.drawer:not([hidden])) {
+    --drawer-push: min(36rem, 94vw);
+  }
+
+  .screen-play:has(.drawer:not([hidden])) .play-shell {
+    padding-right: var(--drawer-push);
+  }
+
+  /* the dock narrows with the stage, so it drops to icons while the map is open */
+  .screen-play:has(.drawer:not([hidden])) .dock-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
 }
 
 .stage-wrap {
   position: relative;
-  width: min(100vw, calc((100dvh - var(--dock-h)) * 16 / 9));
+  width: min(calc(100vw - var(--drawer-push, 0px)), calc((100dvh - var(--dock-h)) * 16 / 9));
   aspect-ratio: 16 / 9;
   container-type: inline-size;
   background: var(--ink);
@@ -714,10 +735,48 @@ code {
 
 .choices {
   position: absolute;
-  inset: 5cqw 12cqw auto 12cqw;
+  inset: 0 27cqw 19cqw 27cqw;
   display: grid;
+  align-content: center;
   gap: 1.1cqw;
   justify-items: stretch;
+  pointer-events: none;
+}
+
+.choices[hidden] {
+  display: none;
+}
+
+.choice {
+  pointer-events: auto;
+}
+
+.stage-bg,
+.stage-sprites {
+  transition: filter 0.45s var(--ease);
+}
+
+.stage-wrap:has(.choices:not([hidden])) .stage-bg {
+  filter: brightness(0.62) saturate(0.85);
+}
+
+.stage-wrap:has(.choices:not([hidden])) .stage-sprites {
+  filter: brightness(0.8);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .choice {
+    animation: choice-in 0.45s var(--ease) backwards;
+  }
+
+  .choice:nth-child(2) { animation-delay: 0.06s; }
+  .choice:nth-child(3) { animation-delay: 0.12s; }
+  .choice:nth-child(4) { animation-delay: 0.18s; }
+}
+
+@keyframes choice-in {
+  from { opacity: 0; transform: translateY(0.8cqw); }
+  to { opacity: 1; transform: none; }
 }
 
 .choice {
@@ -731,7 +790,7 @@ code {
   background: rgba(245, 242, 234, 0.97);
   color: var(--ink);
   font-family: var(--font-display);
-  font-size: clamp(0.95rem, 2cqw, 1.5rem);
+  font-size: clamp(0.95rem, 1.8cqw, 1.4rem);
   line-height: 1.35;
   text-align: left;
   box-shadow: var(--shadow-1);
@@ -884,27 +943,73 @@ code {
   }
 }
 
+/* A phone on its side has no room for a second row of dock buttons, so the dock goes icon only. */
+@media (max-height: 480px) and (orientation: landscape) {
+  .dock-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  .dock-btn {
+    min-width: 2.75rem;
+    justify-content: center;
+  }
+}
+
 @media (max-width: 720px) and (orientation: portrait) {
+  :root {
+    --dock-h: 7rem;
+  }
+
   .screen-play {
-    place-items: start center;
+    place-items: stretch;
+  }
+
+  .play-shell {
+    height: 100dvh;
+    justify-content: space-between;
   }
 
   .stage-wrap {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
     width: 100vw;
+    min-height: 0;
     aspect-ratio: auto;
   }
 
   .stage {
     position: relative;
     inset: auto;
-    aspect-ratio: 16 / 9;
+    flex: 1 1 auto;
+    min-height: 12rem;
+    aspect-ratio: auto;
   }
+
+  .stage-bg img {
+    object-fit: cover;
+    object-position: 70% 50%;
+  }
+
+  .actor {
+    height: 78%;
+    bottom: 0;
+  }
+
+  .actor[data-at="left"] { left: -4%; }
+  .actor[data-at="right"] { right: -4%; }
+  .actor[data-at="center"] { margin-left: 0; translate: -50% 0; }
 
   .dialogue {
     position: relative;
     left: auto;
     right: auto;
     bottom: auto;
+    flex: 0 0 auto;
     margin: 0;
     padding: 1.1rem 1rem 1.2rem;
     min-height: 9.5rem;
@@ -924,11 +1029,13 @@ code {
   }
 
   .choices {
-    position: relative;
-    inset: auto;
+    position: absolute;
+    inset: 0 0 auto 0;
+    bottom: var(--dialogue-h, 10.5rem);
+    align-content: end;
     gap: 0.5rem;
     padding: 0.75rem;
-    background: var(--stage);
+    background: linear-gradient(to top, rgba(20, 24, 29, 0.55), transparent 80%);
   }
 
   .choice {
@@ -941,6 +1048,42 @@ code {
     position: fixed;
     z-index: 20;
     padding: 1.5rem;
+  }
+
+  .dock {
+    display: grid;
+    grid-template-columns: repeat(10, 1fr);
+    gap: 0;
+    width: 100%;
+    padding: 0.25rem 0.25rem calc(0.25rem + env(safe-area-inset-bottom, 0px));
+    background: var(--ink-2);
+    border-top: 1px solid var(--ink-3);
+  }
+
+  .dock-btn {
+    grid-column: span 2;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.15rem;
+    min-width: 0;
+    min-height: 3.25rem;
+    padding: 0.35rem 0.1rem;
+    font-size: 0.7rem;
+    line-height: 1.1;
+  }
+
+  .dock-btn:nth-child(6) {
+    grid-column: 2 / span 2;
+  }
+
+  /* labels return under the icons now that the dock is a grid */
+  .dock-label {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip: auto;
+    white-space: nowrap;
   }
 }
 
@@ -1147,6 +1290,45 @@ code {
 .dag .edge-label {
   font-size: 9.5px;
   fill: var(--copper-soft);
+  paint-order: stroke;
+  stroke: var(--ink-2);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+  pointer-events: auto;
+  cursor: help;
+}
+
+.dag .node[data-state="open"]:hover rect {
+  stroke: var(--paper);
+}
+
+.map-scroll[data-zoom="fit"] .dag {
+  width: 100%;
+  height: auto;
+}
+
+.graph-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.graph-tools .btn {
+  min-height: 2.75rem;
+}
+
+.graph-tools .btn[aria-pressed="true"] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+
+.graph-tip {
+  margin-left: auto;
+  font-size: 0.8rem;
+  color: var(--muted);
 }
 
 .screen-inspector .dag text {
@@ -1437,8 +1619,14 @@ code {
   font-family: var(--font-display);
 }
 
+#panel-graph:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+}
+
 #panel-graph .map-scroll {
-  height: 100%;
+  flex: 1 1 auto;
+  min-height: 18rem;
   background: var(--ink-2);
 }
 
@@ -1502,12 +1690,32 @@ code {
   }
 
   .editor {
-    min-height: 22rem;
+    min-height: 18rem;
   }
 
+  /* The verdict is the point of this screen, so it comes before the source on small screens. */
   .report-pane {
+    order: -1;
     border-left: 0;
-    border-top: 1.5px solid var(--ink);
+    border-bottom: 1.5px solid var(--ink);
+  }
+}
+
+@media (max-width: 600px) {
+  .bar-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+    gap: var(--space-2);
+  }
+
+  .bar-actions .btn-primary {
+    grid-column: 1 / -1;
+  }
+
+  .graph-tip {
+    flex-basis: 100%;
+    margin-left: 0;
   }
 }
 

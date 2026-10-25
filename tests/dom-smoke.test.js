@@ -522,6 +522,35 @@ test('App controller: map drawer renders gauges and DAG SVG nodes', function () 
   assert.ok(svg.children.length > 20);
 });
 
+test('App controller: no two guard labels on the story map sit on top of each other', function () {
+  const env = buildMockEnv();
+  env.app.startNewGame();
+  env.app.toggleMapDrawer(true);
+  const svg = env.doc.getElementById('map-scroll').children[0];
+  const labels = svg.children
+    .filter(function (c) { return c.getAttribute('class') === 'edge-label'; })
+    .map(function (c) {
+      const tipLength = c.children.length ? c.children[0].textContent.length : 0;
+      const shownLength = c.textContent.length - tipLength;
+      return { x: Number(c.getAttribute('x')), y: Number(c.getAttribute('y')), w: shownLength * 5.8 + 8 };
+    });
+  assert.ok(labels.length > 3);
+  labels.forEach(function (a, i) {
+    labels.slice(i + 1).forEach(function (b) {
+      const clash = Math.abs(a.x - b.x) < (a.w + b.w) / 2 && Math.abs(a.y - b.y) < 16;
+      assert.equal(clash, false, JSON.stringify([a, b]));
+    });
+  });
+});
+
+test('Layout: the graph has size controls, the dock fits a phone, and the map pushes the stage aside', function () {
+  assert.match(HTML, /data-zoom-set="fit"/);
+  assert.match(HTML, /data-zoom-set="actual"/);
+  assert.match(CSS, /@media \(max-width: 720px\) and \(orientation: portrait\)/);
+  assert.match(CSS, /@media \(max-height: 480px\) and \(orientation: landscape\)/);
+  assert.match(CSS, /--drawer-push/);
+});
+
 test('App controller: full playthrough unlocks ending in gallery and shows endcard', function () {
   const env = buildMockEnv();
   env.app.startNewGame();

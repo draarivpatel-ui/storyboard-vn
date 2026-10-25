@@ -724,6 +724,7 @@
       var taken = rt ? Engine.trailEdges(rt.trail || []) : {};
       var liveVars = (rt && rt.st && rt.st.vars) || {};
       var livePers = (rt && rt.st && rt.st.persistent) || state.persistent;
+      var placedLabels = [];
 
       layout.edges.forEach(function (edge) {
         var path = doc.createElementNS(SVG_NS, 'path');
@@ -743,12 +744,29 @@
         svg.appendChild(path);
 
         if (edge.when) {
+          var shown = edge.when.length > 26 ? edge.when.slice(0, 24) + '..' : edge.when;
+          var lw = shown.length * 5.8 + 8;
+          var lx = Math.round(edge.labelX);
+          var ly = Math.round(edge.labelY - 4);
+          /* Guard labels from neighbouring edges often land on the same spot, so
+             push a label up in steps until it no longer overlaps one already placed. */
+          for (var tries = 0; tries < 6; tries++) {
+            var clash = placedLabels.some(function (o) {
+              return Math.abs(o.x - lx) < (o.w + lw) / 2 && Math.abs(o.y - ly) < 16;
+            });
+            if (!clash) break;
+            ly -= 16;
+          }
+          placedLabels.push({ x: lx, y: ly, w: lw });
           var lbl = doc.createElementNS(SVG_NS, 'text');
           lbl.setAttribute('class', 'edge-label');
-          lbl.setAttribute('x', String(Math.round(edge.labelX)));
-          lbl.setAttribute('y', String(Math.round(edge.labelY - 4)));
+          lbl.setAttribute('x', String(lx));
+          lbl.setAttribute('y', String(ly));
           lbl.setAttribute('text-anchor', 'middle');
-          lbl.textContent = edge.when.length > 26 ? edge.when.slice(0, 24) + '..' : edge.when;
+          lbl.textContent = shown;
+          var tip = doc.createElementNS(SVG_NS, 'title');
+          tip.textContent = 'Only when ' + edge.when + ' (' + edge.from + ' to ' + edge.to + ')';
+          lbl.appendChild(tip);
           svg.appendChild(lbl);
         }
       });
@@ -790,7 +808,28 @@
       var scrollEl = byId('map-scroll');
       if (!scrollEl) return;
       scrollEl.innerHTML = '';
-      scrollEl.appendChild(buildDagSvg(state.analysis, state.runtime));
+      var mapSvg = buildDagSvg(state.analysis, state.runtime);
+      scrollEl.appendChild(mapSvg);
+      centerOnNode(scrollEl, mapSvg.querySelector ? mapSvg.querySelector('.node[data-state="current"] rect') : null);
+    }
+
+    /* Scroll a graph container so a node (or, with none, the middle of the graph) sits in view. */
+    function centerOnNode(scrollEl, rect) {
+      if (!scrollEl || scrollEl.clientWidth === undefined) return;
+      var x = rect ? Number(rect.getAttribute('x')) + Number(rect.getAttribute('width')) / 2 : scrollEl.scrollWidth / 2;
+      var y = rect ? Number(rect.getAttribute('y')) + Number(rect.getAttribute('height')) / 2 : 0;
+      scrollEl.scrollLeft = Math.max(0, x - scrollEl.clientWidth / 2);
+      if (rect) scrollEl.scrollTop = Math.max(0, y - scrollEl.clientHeight / 2);
+    }
+
+    function setGraphZoom(mode) {
+      var scrollEl = byId('graph-scroll');
+      if (!scrollEl) return;
+      scrollEl.setAttribute('data-zoom', mode);
+      doc.querySelectorAll('[data-zoom-set]').forEach(function (b) {
+        b.setAttribute('aria-pressed', b.getAttribute('data-zoom-set') === mode ? 'true' : 'false');
+      });
+      if (mode === 'actual') centerOnNode(scrollEl, null);
     }
 
     function openDialog(dlg) {
@@ -1177,6 +1216,10 @@
           panel.hidden = !active;
         }
       });
+      if (tabName === 'graph') {
+        var gs = byId('graph-scroll');
+        setGraphZoom((gs && gs.getAttribute('data-zoom')) || 'actual');
+      }
     }
 
     function formatAuditPlaintext(audit) {
@@ -1336,6 +1379,21 @@
           switchInspectorTab(tabBtn.getAttribute('data-tab'));
         });
       });
+
+      doc.querySelectorAll('[data-zoom-set]').forEach(function (zoomBtn) {
+        zoomBtn.addEventListener('click', function () {
+          setGraphZoom(zoomBtn.getAttribute('data-zoom-set'));
+        });
+      });
+
+      /* On a phone the dialogue box grows with the line, and the choices sit just above it. */
+      var stageWrapEl = byId('stage-wrap');
+      var dialogueBox = byId('dialogue');
+      if (stageWrapEl && dialogueBox && typeof win.ResizeObserver === 'function') {
+        new win.ResizeObserver(function () {
+          stageWrapEl.style.setProperty('--dialogue-h', dialogueBox.offsetHeight + 'px');
+        }).observe(dialogueBox);
+      }
 
       if (win.addEventListener) {
         win.addEventListener('pointermove', function (ev) {
