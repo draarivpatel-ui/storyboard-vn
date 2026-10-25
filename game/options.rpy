@@ -11,7 +11,7 @@ define gui.show_name = False
 define config.version = "1.0.0"
 
 define gui.about = _p("""
-A short visual novel for Hack Club Storyboard, set at a coastal observatory on the night of the Long Tide.
+A short visual novel, set at a coastal observatory on the night of the Long Tide.
 
 Three characters, six scenes, four endings. Your choices move trust_score, calibration_drift and lens_unlocked, and those three numbers decide how the century ends.
 

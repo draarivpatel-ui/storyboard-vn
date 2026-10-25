@@ -1,8 +1,12 @@
 # The Glass Meridian
 
-**The Glass Meridian** is a branching visual novel in six scenes and four endings, created for Hack Club Storyboard. It is written in authentic Ren'Py 8 script (`game/script.rpy`) and ships with a zero-dependency JavaScript Ren'Py subset parser, deterministic story runtime, and narrative DAG reachability verifier (`engine.js`) so the exact same story runs both on the web and in the desktop Ren'Py 8 launcher.
+**The Glass Meridian** is a branching visual novel in six scenes and four endings, built as a reference project around Hack Club Storyboard (it is not an entry, see the next section). It is written in authentic Ren'Py 8 script (`game/script.rpy`) and ships with a zero-dependency JavaScript Ren'Py subset parser, deterministic story runtime, and narrative DAG reachability verifier (`engine.js`) so the exact same story runs both on the web and in the desktop Ren'Py 8 launcher.
 
 Live Web Edition: `https://aariv.me/storyboard-vn/`
+
+## Honest notes first
+
+The story, the code and the pictures were written with an AI assistant in one sitting. The art is drawn by a program (`scripts/build-art.js`), not by hand. Hack Club Storyboard tracks coding time with Hackatime and art time with Lapse, and its submit form asks for the hours spent, an itch.io link and a thread in the `#storyboard` Slack channel. This project has no Hackatime or Lapse hours, no itch.io page and no thread, and it is not Aariv's own hand-made work. So it is a disclosed AI-assisted reference build, not a Storyboard entry, and nothing was submitted. No human has played it. The playthroughs were automated. See [NOTES.md](NOTES.md).
 
 ## Premise
 
@@ -44,7 +48,7 @@ Requires Node.js 18+:
 npm test
 ```
 
-This runs 66 unit and DOM smoke tests (`tests/engine.test.js` and `tests/dom-smoke.test.js`) via `node --test`.
+This runs 68 unit and DOM smoke tests (`tests/engine.test.js` and `tests/dom-smoke.test.js`) via `node --test`.
 
 ### 2. Play in a browser
 
