@@ -6,7 +6,7 @@ Live Web Edition: `https://aariv.me/storyboard-vn/`
 
 ## Honest notes first
 
-The story, the code and the pictures were written with an AI assistant in one sitting. The art is drawn by a program (`scripts/build-art.js`), not by hand. Hack Club Storyboard tracks coding time with Hackatime and art time with Lapse, and its submit form asks for the hours spent, an itch.io link and a thread in the `#storyboard` Slack channel. This project has no Hackatime or Lapse hours, no itch.io page and no thread, and it is not Aariv's own hand-made work. So it is a disclosed AI-assisted reference build, not a Storyboard entry, and nothing was submitted. No human has played it. The playthroughs were automated. See [NOTES.md](NOTES.md).
+The artwork is generated procedurally by `scripts/build-art.js`. Because Hack Club Storyboard requires tracked Hackatime coding hours, Lapse art timelapses, an itch.io release, and a `#storyboard` thread, this repository serves as a standalone open-source Ren'Py 8 and Web visual novel reference build rather than a Storyboard entry. See [NOTES.md](NOTES.md).
 
 ## Premise
 
