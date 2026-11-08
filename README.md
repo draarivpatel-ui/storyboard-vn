@@ -4,7 +4,7 @@
 
 Live Web Edition: `https://aariv.me/storyboard-vn/`
 
-## Honest notes first
+## Architecture notes
 
 The artwork is generated procedurally by `scripts/build-art.js`. Because Hack Club Storyboard requires tracked Hackatime coding hours, Lapse art timelapses, an itch.io release, and a `#storyboard` thread, this repository serves as a standalone open-source Ren'Py 8 and Web visual novel reference build rather than a Storyboard entry. See [NOTES.md](NOTES.md).
 
