@@ -466,6 +466,44 @@ test('Runtime: restoreSaveSlot rejects tampered or incompatible save objects', f
   }, Engine.StoryError);
 });
 
+test('Runtime: restoreSaveSlot rejects type-confused saves instead of crashing later', function () {
+  const prog = Engine.parseRenpyScript(CANONICAL_SOURCE);
+  const rt = Engine.createStoryRuntime(prog);
+  Engine.advanceStory(rt);
+  const good = Engine.serializeSaveSlot(rt, { slot: 1 });
+
+  assert.throws(function () { Engine.restoreSaveSlot(prog, 42); }, Engine.StoryError);
+  assert.throws(function () { Engine.restoreSaveSlot(prog, 'a string'); }, Engine.StoryError);
+
+  const corrupt = function (mutate) {
+    const s = JSON.parse(JSON.stringify(good));
+    mutate(s);
+    return s;
+  };
+
+  assert.throws(function () {
+    Engine.restoreSaveSlot(prog, corrupt(function (s) { s.history = 'x'; }));
+  }, Engine.StoryError);
+  assert.throws(function () {
+    Engine.restoreSaveSlot(prog, corrupt(function (s) { s.persistent = 'x'; }));
+  }, Engine.StoryError);
+  assert.throws(function () {
+    Engine.restoreSaveSlot(prog, corrupt(function (s) { s.trail = 9; }));
+  }, Engine.StoryError);
+  assert.throws(function () {
+    Engine.restoreSaveSlot(prog, corrupt(function (s) { s.visited = ['start']; }));
+  }, Engine.StoryError);
+  assert.throws(function () {
+    Engine.restoreSaveSlot(prog, corrupt(function (s) { delete s.checkpoints[s.checkpoints.length - 1].vars; }));
+  }, Engine.StoryError);
+  assert.throws(function () {
+    Engine.restoreSaveSlot(prog, corrupt(function (s) { s.checkpoints[0].stack = 'no'; }));
+  }, Engine.StoryError);
+
+  const restored = Engine.restoreSaveSlot(prog, corrupt(function () {}));
+  assert.equal(restored.current.text, rt.current.text);
+});
+
 /* ------------------------------------------------------------------ */
 /* 4. Narrative Graph & Reachability Verifier                          */
 /* ------------------------------------------------------------------ */

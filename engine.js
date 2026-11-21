@@ -1306,13 +1306,34 @@
 
   function restoreSaveSlot(program, save, options) {
     var opts = options || {};
-    if (!save || save.format !== 'glass-meridian-save' || save.version !== VERSION || !Array.isArray(save.checkpoints) || save.checkpoints.length === 0) {
+    if (!save || typeof save !== 'object' || save.format !== 'glass-meridian-save' || save.version !== VERSION || !Array.isArray(save.checkpoints) || save.checkpoints.length === 0) {
       throw new StoryError('This save slot is not valid for this version of the game');
     }
+    ['history', 'choicesMade', 'trail'].forEach(function (key) {
+      if (save[key] !== undefined && save[key] !== null && !Array.isArray(save[key])) {
+        throw new StoryError('This save slot is damaged');
+      }
+    });
+    ['visited', 'persistent'].forEach(function (key) {
+      if (save[key] !== undefined && save[key] !== null && (typeof save[key] !== 'object' || Array.isArray(save[key]))) {
+        throw new StoryError('This save slot is damaged');
+      }
+    });
+    save.checkpoints.forEach(function (snap) {
+      if (!snap || typeof snap !== 'object' || Array.isArray(snap) ||
+          !snap.pc || typeof snap.pc !== 'object' || typeof snap.pc.label !== 'string' ||
+          !has(program.labels, snap.pc.label)) {
+        throw new StoryError('This save refers to a label that is not in the script');
+      }
+      if (!Array.isArray(snap.stack) ||
+          !snap.vars || typeof snap.vars !== 'object' || Array.isArray(snap.vars) ||
+          !snap.stage || typeof snap.stage !== 'object' || Array.isArray(snap.stage) ||
+          typeof snap.historyLength !== 'number' || typeof snap.choicesLength !== 'number' ||
+          typeof snap.trailLength !== 'number') {
+        throw new StoryError('This save slot is damaged');
+      }
+    });
     var last = save.checkpoints[save.checkpoints.length - 1];
-    if (!last.pc || !has(program.labels, last.pc.label)) {
-      throw new StoryError('This save refers to a label that is not in the script');
-    }
     var rt = createStoryRuntime(program, { persistent: save.persistent, visited: save.visited, seen: opts.seen });
     rt.history = clone(save.history || []);
     rt.choicesMade = clone(save.choicesMade || []);

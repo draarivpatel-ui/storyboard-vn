@@ -75,12 +75,13 @@
             <li>
               <button type="button" class="menu-item" data-action="inspector">
                 <span class="menu-idx">04</span>
-                <span class="menu-label">Script &amp; DAG Inspector</span>
+                <span class="menu-label">Script &amp; Story Graph Inspector</span>
                 <span class="menu-hint">audit the .rpy</span>
               </button>
             </li>
           </ol>
         </nav>
+        <p class="menu-error" id="menu-error" role="alert" hidden></p>
         <p class="menu-foot">This page parses and plays the real <code>game/script.rpy</code>. The same repository opens as a Ren'Py 8 project on desktop as a standalone open-source reference build.</p>
       </div>
     </section>
@@ -176,7 +177,7 @@
         <button type="button" class="btn btn-quiet" data-action="menu">
           <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-home"/></svg><span>Main Menu</span>
         </button>
-        <h2 id="inspector-title" class="bar-title">Script &amp; DAG Inspector</h2>
+        <h2 id="inspector-title" class="bar-title">Script &amp; Story Graph Inspector</h2>
         <div class="bar-actions">
           <button type="button" class="btn" id="btn-reset">
             <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-reset"/></svg><span>Reset script</span>
@@ -262,6 +263,10 @@
       <label class="check" for="set-parallax">
         <input type="checkbox" id="set-parallax" checked>
         <span>Parallax on pointer movement</span>
+      </label>
+      <label class="check" for="set-hotkeys">
+        <input type="checkbox" id="set-hotkeys" checked>
+        <span>Single-key shortcuts (Space, 1 to 9, H, M, A, S)</span>
       </label>
       <button type="button" class="btn" id="btn-wipe">Erase saves, seen text and found endings</button>
       <h3 class="dlg-sub">Keys</h3>

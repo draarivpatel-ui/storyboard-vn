@@ -1,6 +1,6 @@
 # The Glass Meridian
 
-**The Glass Meridian** is a branching visual novel in six scenes and four endings, built as a reference project around Hack Club Storyboard (it is not an entry, see the next section). It is written in authentic Ren'Py 8 script (`game/script.rpy`) and ships with a zero-dependency JavaScript Ren'Py subset parser, deterministic story runtime, and narrative DAG reachability verifier (`engine.js`) so the exact same story runs both on the web and in the desktop Ren'Py 8 launcher.
+**The Glass Meridian** is a branching visual novel in six scenes and four endings, built as a reference project around Hack Club Storyboard (it is not an entry, see the next section). It is written in authentic Ren'Py 8 script (`game/script.rpy`) and ships with a zero-dependency JavaScript Ren'Py subset parser, deterministic story runtime, and narrative story-graph reachability verifier (`engine.js`) so the exact same story runs both on the web and in the desktop Ren'Py 8 launcher.
 
 Live Web Edition: `https://aariv.me/storyboard-vn/`
 
@@ -29,13 +29,13 @@ This repository is structured as both a valid Ren'Py 8 desktop project and a sta
 
 - **Desktop Ren'Py 8 (`game/`)**: Open the repository folder in the Ren'Py 8 Launcher and click **Launch Project**. It uses `game/script.rpy`, `game/screens.rpy`, `game/options.rpy`, `game/gui.rpy`, and the 18 vector assets in `game/images/`.
 - **Browser Runtime (`index.html`, `engine.js`, `app.js`, `styles.css`)**: Parses `game/script.rpy` directly in JavaScript without `eval()`, executing `define`, `default`, `image`, `label`, `scene`, `show`, `hide`, `with`, `menu` (with `if` guards), `$ var = expr` mutations, `if / elif / else` branches, `jump`, `call`, and `return`.
-- **Script & DAG Inspector**: Built into the web interface. Performs static control-flow analysis, Tarjan strongly connected component cycle detection, and breadth-first state-space exploration over `game/script.rpy` (or any custom Ren'Py script you type into the live editor) to prove that all labels and endings are reachable and to compute the shortest choice sequence to each ending.
+- **Script & Story Graph Inspector**: Built into the web interface. Performs static control-flow analysis, Tarjan strongly connected component cycle detection, and breadth-first state-space exploration over `game/script.rpy` (or any custom Ren'Py script you type into the live editor) to prove that all labels and endings are reachable and to compute the shortest choice sequence to each ending.
 
 ## Features in the Browser Edition
 
 - **Playable Proscenium Stage**: 16:9 stage with 6 layered SVG backgrounds (`bg_harbor`, `bg_archive`, `bg_workshop`, `bg_storm`, `bg_lens`, `bg_dawn`), atmospheric lighting and weather animations, pointer parallax, and 3 characters (`mira`, `soren`, `voss`) each composited from body and expression layers (`calm`, `worried`, `smile`, `guarded`, `smirk`, `open`, `stern`, `soft`, `grave`).
 - **Full VN Controls**: Step-back rollback across dialogue and choices, scrollable dialogue backlog, 6 browser save/load slots, auto-advance, seen/unseen skip mode, configurable typewriter speed, and keyboard shortcuts (`Space` / `Enter` / `Right` to advance, `Left` / `Backspace` to roll back, `1-9` to pick a choice, `H` backlog, `M` narrative map, `A` auto, `S` skip, `Escape` menu).
-- **Live Narrative Map Drawer**: Displays live gauges for `trust_score`, `calibration_drift`, and `lens_unlocked` alongside an interactive SVG directed acyclic graph highlighting visited labels, taken edges, and guard conditions.
+- **Live Narrative Map Drawer**: Displays live gauges for `trust_score`, `calibration_drift`, and `lens_unlocked` alongside an interactive SVG story graph highlighting visited labels, taken edges, and guard conditions.
 - **Ending Gallery**: Tracks discovered endings in `localStorage` (`persistent.ending_*`) and displays verified shortest choice routes for every ending.
 
 ## Running Locally

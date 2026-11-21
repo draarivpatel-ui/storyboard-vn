@@ -2,7 +2,7 @@
  * anchor hue: copper oklch(52% 0.13 40) on parchment, sea-glass teal oklch(41% 0.07 205)
  * theme: custom, palette fixed by the brief (#F5F2EA, #EAE4D6, #14181D, #B4532A, #1E5E63)
  * type: Iowan Old Style / Palatino display and dialogue, system sans for controls, system mono for source and numerals
- * nav: side index (menu), edge dock (play) · enrichment: layered SVG scenes, live narrative DAG
+ * nav: side index (menu), edge dock (play) · enrichment: layered SVG scenes, live story graph
  * pre-emit critique: P4 H4 E4 S4 R4 V4
  */
 
@@ -202,6 +202,12 @@ code {
   background: rgba(20, 24, 29, 0.08);
 }
 
+.btn[data-armed] {
+  background: var(--copper-deep);
+  border-color: var(--copper-deep);
+  color: var(--paper);
+}
+
 .icon-btn {
   display: inline-grid;
   place-items: center;
@@ -334,6 +340,20 @@ code {
 .menu-item .icon {
   align-self: center;
   color: var(--copper-soft);
+}
+
+.menu-error {
+  margin: 0;
+  max-width: 44ch;
+  padding: 0.6rem 0.9rem;
+  border-left: 4px solid var(--brass);
+  background: rgba(20, 24, 29, 0.45);
+  font-size: 0.88rem;
+  color: var(--paper);
+}
+
+.menu-error[hidden] {
+  display: none;
 }
 
 .menu-foot {
@@ -691,6 +711,8 @@ code {
 .speaker[data-speaker="mira"] { border-bottom: 0.4cqw solid var(--teal-soft); }
 .speaker[data-speaker="soren"] { border-bottom: 0.4cqw solid var(--copper-soft); }
 .speaker[data-speaker="voss"] { border-bottom: 0.4cqw solid var(--brass); }
+/* The character's own color= wins over the per-name fallbacks above. */
+.speaker[data-tinted] { border-bottom: 0.4cqw solid var(--speaker-color); }
 
 .dialogue-text {
   margin: 0;

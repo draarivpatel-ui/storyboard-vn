@@ -4,8 +4,8 @@
  * Browser controller connecting engine.js and game/script.rpy to index.html.
  * Handles the main menu, playable stage (SVG scene transitions, layered
  * character expressions, typewriter text, branching choices), save/load slots,
- * rollback, dialogue backlog, live narrative DAG drawer, ending gallery, and
- * the interactive Ren'Py script & DAG inspector.
+ * rollback, dialogue backlog, live narrative map drawer, ending gallery, and
+ * the interactive Ren'Py script & story graph inspector.
  */
 (function (root) {
   'use strict';
@@ -79,7 +79,8 @@
       settings: {
         cps: 45,
         showLocked: true,
-        parallax: true
+        parallax: true,
+        hotkeys: true
       },
       persistent: {
         ending_meridian_restored: false,
@@ -95,44 +96,45 @@
       return doc.getElementById(id);
     }
 
-    function loadStorage() {
+    /* One corrupt key must not discard the rest of the stored progress,
+       so every key parses inside its own try/catch. */
+    function readStoredJson(st, key) {
       try {
-        var st = win.localStorage;
-        if (!st) return;
-        var pRaw = st.getItem(STORAGE_PREFIX + 'persistent');
-        if (pRaw) {
-          var pObj = JSON.parse(pRaw);
-          if (pObj && typeof pObj === 'object') {
-            Object.keys(pObj).forEach(function (k) {
-              state.persistent[k] = pObj[k];
-            });
-          }
-        }
-        var seenRaw = st.getItem(STORAGE_PREFIX + 'seen');
-        if (seenRaw) {
-          var sObj = JSON.parse(seenRaw);
-          if (sObj && typeof sObj === 'object') state.seen = sObj;
-        }
-        var setRaw = st.getItem(STORAGE_PREFIX + 'settings');
-        if (setRaw) {
-          var cfg = JSON.parse(setRaw);
-          if (cfg && typeof cfg === 'object') {
-            if (typeof cfg.cps === 'number') state.settings.cps = cfg.cps;
-            if (typeof cfg.showLocked === 'boolean') state.settings.showLocked = cfg.showLocked;
-            if (typeof cfg.parallax === 'boolean') state.settings.parallax = cfg.parallax;
-          }
-        }
-        var slotsRaw = st.getItem(STORAGE_PREFIX + 'slots');
-        if (slotsRaw) {
-          var arr = JSON.parse(slotsRaw);
-          if (Array.isArray(arr)) {
-            for (var i = 0; i < SLOT_COUNT; i++) {
-              state.slots[i] = arr[i] || null;
-            }
-          }
-        }
+        var raw = st.getItem(key);
+        return raw ? JSON.parse(raw) : null;
       } catch (e) {
-        /* localStorage may be unavailable in private browsing or tests */
+        return null;
+      }
+    }
+
+    function loadStorage() {
+      var st;
+      try {
+        st = win.localStorage;
+      } catch (e) {
+        st = null;
+      }
+      if (!st) return;
+      var pObj = readStoredJson(st, STORAGE_PREFIX + 'persistent');
+      if (pObj && typeof pObj === 'object' && !Array.isArray(pObj)) {
+        Object.keys(pObj).forEach(function (k) {
+          state.persistent[k] = pObj[k];
+        });
+      }
+      var sObj = readStoredJson(st, STORAGE_PREFIX + 'seen');
+      if (sObj && typeof sObj === 'object' && !Array.isArray(sObj)) state.seen = sObj;
+      var cfg = readStoredJson(st, STORAGE_PREFIX + 'settings');
+      if (cfg && typeof cfg === 'object' && !Array.isArray(cfg)) {
+        if (typeof cfg.cps === 'number') state.settings.cps = cfg.cps;
+        if (typeof cfg.showLocked === 'boolean') state.settings.showLocked = cfg.showLocked;
+        if (typeof cfg.parallax === 'boolean') state.settings.parallax = cfg.parallax;
+        if (typeof cfg.hotkeys === 'boolean') state.settings.hotkeys = cfg.hotkeys;
+      }
+      var arr = readStoredJson(st, STORAGE_PREFIX + 'slots');
+      if (Array.isArray(arr)) {
+        for (var i = 0; i < SLOT_COUNT; i++) {
+          state.slots[i] = arr[i] || null;
+        }
       }
     }
 
@@ -246,16 +248,41 @@
       return res;
     }
 
+    function showMenuError(message) {
+      var el = byId('menu-error');
+      if (!el) return;
+      el.textContent = message;
+      el.hidden = false;
+    }
+
+    function clearMenuError() {
+      var el = byId('menu-error');
+      if (el) {
+        el.hidden = true;
+        el.textContent = '';
+      }
+    }
+
     function startNewGame(customSource) {
       if (typeof customSource === 'string') {
         compileSource(customSource);
       } else if (!state.program) {
         compileSource(state.canonicalSource);
       }
-      state.runtime = Engine.createStoryRuntime(state.program, {
-        persistent: state.persistent,
-        seen: state.seen
-      });
+      if (!state.program || !state.program.labels || !state.program.labels.start) {
+        showMenuError('The story script did not load, so a new expedition cannot start. If you opened this file directly, keep assets/script-bundle.js beside index.html or serve the folder over HTTP.');
+        return;
+      }
+      try {
+        state.runtime = Engine.createStoryRuntime(state.program, {
+          persistent: state.persistent,
+          seen: state.seen
+        });
+      } catch (err) {
+        showMenuError('The story could not start: ' + (err && err.message ? err.message : err));
+        return;
+      }
+      clearMenuError();
       state.currentBg = null;
       var bgWrap = byId('stage-bg');
       var spWrap = byId('stage-sprites');
@@ -406,10 +433,19 @@
             speakerEl.hidden = false;
             speakerEl.textContent = ev.who;
             speakerEl.setAttribute('data-speaker', ev.speaker || '');
+            if (ev.color) {
+              speakerEl.style.setProperty('--speaker-color', ev.color);
+              speakerEl.setAttribute('data-tinted', 'yes');
+            } else {
+              speakerEl.style.setProperty('--speaker-color', '');
+              speakerEl.removeAttribute('data-tinted');
+            }
           } else {
             speakerEl.hidden = true;
             speakerEl.textContent = '';
             speakerEl.removeAttribute('data-speaker');
+            speakerEl.style.setProperty('--speaker-color', '');
+            speakerEl.removeAttribute('data-tinted');
           }
         }
         if (textEl) {
@@ -546,6 +582,7 @@
 
     function handleAdvance() {
       if (!state.runtime || state.screen !== 'play') return;
+      if (doc.querySelector && doc.querySelector('dialog[open]')) return;
       if (state.isTyping) {
         stopTypewriter(true);
         scheduleAutoOrSkip();
@@ -622,6 +659,7 @@
     function scheduleAutoOrSkip() {
       clearTimers();
       if (!state.runtime || state.screen !== 'play') return;
+      if (doc.querySelector && doc.querySelector('dialog[open]')) return;
       var cur = state.runtime.current;
       if (!cur || cur.type !== 'say') return;
 
@@ -834,6 +872,7 @@
 
     function openDialog(dlg) {
       if (!dlg) return;
+      stopAutoAndSkip();
       if (typeof dlg.showModal === 'function') {
         try {
           if (!dlg.open) dlg.showModal();
@@ -954,8 +993,15 @@
               renderSlotsDialog();
               closeDialog(byId('dlg-slots'));
             } else if (saved) {
-              if (!state.program) compileSource(state.canonicalSource);
-              state.runtime = Engine.restoreSaveSlot(state.program, saved, { seen: state.seen });
+              try {
+                if (!state.program) compileSource(state.canonicalSource);
+                state.runtime = Engine.restoreSaveSlot(state.program, saved, { seen: state.seen });
+              } catch (err) {
+                if (noteEl) {
+                  noteEl.textContent = 'Could not load this slot: ' + (err && err.message ? err.message : err);
+                }
+                return;
+              }
               state.currentBg = null;
               closeDialog(byId('dlg-slots'));
               showScreen('play');
@@ -990,6 +1036,8 @@
       }
       if (lockedCheck) lockedCheck.checked = Boolean(state.settings.showLocked);
       if (parallaxCheck) parallaxCheck.checked = Boolean(state.settings.parallax);
+      var hotkeysCheck = byId('set-hotkeys');
+      if (hotkeysCheck) hotkeysCheck.checked = Boolean(state.settings.hotkeys);
       openDialog(byId('dlg-settings'));
     }
 
@@ -1226,7 +1274,7 @@
       if (!audit) return '';
       var a = audit.analysis;
       var lines = [
-        'The Glass Meridian: Script & DAG Audit Report',
+        'The Glass Meridian: Script & Story Graph Audit Report',
         'Status: ' + (audit.ok ? 'PASS' : 'FAIL'),
         'Labels: ' + a.stats.labelCount + ' (' + a.stats.reachableCount + ' reachable)',
         'Edges: ' + a.stats.edgeCount + ', Menus: ' + a.stats.menuCount + ', Choices: ' + a.stats.choiceCount,
@@ -1329,9 +1377,38 @@
         });
       }
 
+      var hotkeysCheck = byId('set-hotkeys');
+      if (hotkeysCheck) {
+        hotkeysCheck.addEventListener('change', function () {
+          state.settings.hotkeys = Boolean(hotkeysCheck.checked);
+          saveStorage();
+        });
+      }
+
+      /* Destructive wipe needs a second click, not a modal confirm. */
       var wipeBtn = byId('btn-wipe');
       if (wipeBtn) {
+        var WIPE_LABEL = wipeBtn.textContent || 'Erase saves, seen text and found endings';
+        var wipeArmed = false;
+        var wipeTimer = null;
+        var disarmWipe = function () {
+          wipeArmed = false;
+          if (wipeTimer) {
+            clearTimeout(wipeTimer);
+            wipeTimer = null;
+          }
+          wipeBtn.removeAttribute('data-armed');
+          wipeBtn.textContent = WIPE_LABEL;
+        };
         wipeBtn.addEventListener('click', function () {
+          if (!wipeArmed) {
+            wipeArmed = true;
+            wipeBtn.setAttribute('data-armed', 'yes');
+            wipeBtn.textContent = 'Click again to erase everything';
+            wipeTimer = setTimeout(disarmWipe, 4000);
+            return;
+          }
+          disarmWipe();
           wipeAllProgress();
         });
       }
@@ -1374,9 +1451,25 @@
         });
       }
 
+      /* Roving tabindex needs the ARIA tabs arrow-key contract or the
+         inactive tabs are unreachable by keyboard. */
+      var TAB_ORDER = ['audit', 'graph', 'endings'];
       doc.querySelectorAll('.tabs [data-tab]').forEach(function (tabBtn) {
         tabBtn.addEventListener('click', function () {
           switchInspectorTab(tabBtn.getAttribute('data-tab'));
+        });
+        tabBtn.addEventListener('keydown', function (ev) {
+          var idx = TAB_ORDER.indexOf(tabBtn.getAttribute('data-tab'));
+          var next = -1;
+          if (ev.key === 'ArrowRight' || ev.key === 'ArrowDown') next = (idx + 1) % TAB_ORDER.length;
+          else if (ev.key === 'ArrowLeft' || ev.key === 'ArrowUp') next = (idx + TAB_ORDER.length - 1) % TAB_ORDER.length;
+          else if (ev.key === 'Home') next = 0;
+          else if (ev.key === 'End') next = TAB_ORDER.length - 1;
+          if (idx < 0 || next < 0 || next === idx) return;
+          ev.preventDefault();
+          switchInspectorTab(TAB_ORDER[next]);
+          var target = byId('tab-' + TAB_ORDER[next]);
+          if (target && typeof target.focus === 'function') target.focus();
         });
       });
 
@@ -1411,10 +1504,6 @@
             state.shiftHeld = true;
             updateDockToggleButtons();
           }
-          var activeTag = doc.activeElement && doc.activeElement.tagName
-            ? doc.activeElement.tagName.toLowerCase()
-            : '';
-          if (activeTag === 'textarea' || activeTag === 'input') return;
 
           var openDlg = doc.querySelector('dialog[open]');
           if (openDlg) {
@@ -1425,8 +1514,34 @@
             return;
           }
 
+          /* A focused control owns the keyboard: Enter and Space must activate
+             it natively instead of advancing the story, and single-character
+             shortcuts must not fire over it. Escape stays global. */
+          var el = doc.activeElement;
+          var interactive = false;
+          if (el && el !== doc.body) {
+            var t = el.tagName ? el.tagName.toLowerCase() : '';
+            var role = el.getAttribute ? String(el.getAttribute('role') || '') : '';
+            interactive = t === 'textarea' || t === 'input' || t === 'select' ||
+              t === 'button' || t === 'a' ||
+              role === 'button' || role === 'link' || role === 'tab' ||
+              role === 'checkbox' || role === 'switch' || role === 'menuitem' ||
+              role === 'option' || role === 'textbox' ||
+              el.isContentEditable === true ||
+              (el.getAttribute && el.getAttribute('tabindex') !== null);
+          }
+
           if (state.screen === 'play') {
-            if (ev.key === ' ' || ev.key === 'Enter' || ev.key === 'ArrowRight') {
+            if (interactive) {
+              if (ev.key === 'Escape') {
+                ev.preventDefault();
+                if (state.mapOpen) toggleMapDrawer(false);
+                else showScreen('menu');
+              }
+              return;
+            }
+            var charKeys = state.settings.hotkeys !== false;
+            if (ev.key === 'Enter' || ev.key === 'ArrowRight' || (ev.key === ' ' && charKeys)) {
               if (state.runtime && state.runtime.current && state.runtime.current.type === 'say') {
                 ev.preventDefault();
                 handleAdvance();
@@ -1434,22 +1549,22 @@
             } else if (ev.key === 'ArrowLeft' || ev.key === 'Backspace') {
               ev.preventDefault();
               handleRollback();
-            } else if (/^[1-9]$/.test(ev.key)) {
+            } else if (charKeys && /^[1-9]$/.test(ev.key)) {
               var btn = doc.querySelector('.choice[data-hotkey="' + ev.key + '"]');
               if (btn) {
                 ev.preventDefault();
                 btn.click();
               }
-            } else if (ev.key === 'h' || ev.key === 'H') {
+            } else if (charKeys && (ev.key === 'h' || ev.key === 'H')) {
               ev.preventDefault();
               openHistoryDialog();
-            } else if (ev.key === 'm' || ev.key === 'M') {
+            } else if (charKeys && (ev.key === 'm' || ev.key === 'M')) {
               ev.preventDefault();
               toggleMapDrawer();
-            } else if (ev.key === 'a' || ev.key === 'A') {
+            } else if (charKeys && (ev.key === 'a' || ev.key === 'A')) {
               ev.preventDefault();
               toggleAuto();
-            } else if (ev.key === 's' || ev.key === 'S') {
+            } else if (charKeys && (ev.key === 's' || ev.key === 'S')) {
               ev.preventDefault();
               toggleSkip();
             } else if (ev.key === 'Escape') {

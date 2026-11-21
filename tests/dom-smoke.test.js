@@ -80,6 +80,11 @@ function createElement(tag, owner) {
     dispatchInput: function () {
       (listeners.input || []).forEach(function (fn) { fn({ target: el }); });
     },
+    dispatchKey: function (key) {
+      (listeners.keydown || []).forEach(function (fn) {
+        fn({ key: key, preventDefault: function () {}, target: el });
+      });
+    },
     dispatchChange: function () {
       (listeners.change || []).forEach(function (fn) { fn({ target: el }); });
     },
@@ -124,7 +129,8 @@ function createElement(tag, owner) {
   return el;
 }
 
-function buildMockEnv() {
+function buildMockEnv(opts) {
+  opts = opts || {};
   const doc = {
     _byId: {},
     _all: [],
@@ -193,7 +199,8 @@ function buildMockEnv() {
     'panel-audit', 'panel-graph', 'panel-endings', 'stats', 'issues', 'graph-scroll', 'route-list',
     'btn-reset', 'btn-copy', 'btn-play-script',
     'dlg-history', 'backlog', 'dlg-slots', 'dlg-slots-title', 'slots', 'slots-note',
-    'dlg-settings', 'set-speed', 'set-speed-out', 'set-locked', 'set-parallax', 'btn-wipe'
+    'dlg-settings', 'set-speed', 'set-speed-out', 'set-locked', 'set-parallax', 'set-hotkeys',
+    'btn-wipe', 'menu-error'
   ];
   ids.forEach(function (id) {
     const tag = id.indexOf('dlg-') === 0 ? 'dialog' : id === 'src-editor' ? 'textarea' : 'div';
@@ -222,7 +229,7 @@ function buildMockEnv() {
   const store = {};
   const winListeners = {};
   const win = {
-    GLASS_MERIDIAN_SCRIPT: SCRIPT,
+    GLASS_MERIDIAN_SCRIPT: typeof opts.script === 'string' ? opts.script : SCRIPT,
     StoryEngine: Engine,
     innerWidth: 1440,
     innerHeight: 900,
@@ -263,6 +270,9 @@ function buildMockEnv() {
   /* Instant text speed by default in unit tests */
   doc.getElementById('set-speed').value = '0';
   store['glass-meridian:settings'] = JSON.stringify({ cps: 0, showLocked: true, parallax: true });
+  if (opts.store) {
+    Object.keys(opts.store).forEach(function (k) { store[k] = opts.store[k]; });
+  }
 
   const app = App.createApp(doc, win);
   return { doc: doc, win: win, app: app, store: store };
@@ -595,7 +605,7 @@ test('App controller: all 4 endings can be unlocked sequentially in gallery', fu
   assert.equal(env.doc.getElementById('gallery-hint').textContent, '4 of 4 found');
 });
 
-test('App controller: Script & DAG Inspector live-audits edited scripts and switches tabs', function () {
+test('App controller: Script & Story Graph Inspector live-audits edited scripts and switches tabs', function () {
   const env = buildMockEnv();
   env.app.showScreen('inspector');
   const verdict = env.doc.getElementById('verdict');
@@ -624,7 +634,7 @@ test('App controller: Copy report button writes formatted audit report to clipbo
   const env = buildMockEnv();
   env.app.showScreen('inspector');
   env.doc.getElementById('btn-copy').click();
-  assert.match(env.win.navigator.clipboard._copied, /The Glass Meridian: Script & DAG Audit Report/);
+  assert.match(env.win.navigator.clipboard._copied, /The Glass Meridian: Script & Story Graph Audit Report/);
   assert.match(env.win.navigator.clipboard._copied, /Status: PASS/);
 });
 
@@ -678,4 +688,161 @@ test('App controller: keyboard shortcuts advance, rollback, toggle map, and wipe
 
   env.app.wipeAllProgress();
   assert.equal(env.doc.getElementById('continue-hint').textContent, 'no saves yet');
+});
+
+/* ------------------------------------------------------------------ */
+/* 3. Accessibility, robustness and persistence regression tests       */
+/* ------------------------------------------------------------------ */
+
+test('Assets: script-bundle.js embeds the current game/script.rpy verbatim', function () {
+  const bundlePath = path.join(ROOT, 'assets', 'script-bundle.js');
+  const bundle = fs.readFileSync(bundlePath, 'utf8');
+  const m = /window\.GLASS_MERIDIAN_SCRIPT\s*=\s*("(?:[^"\\]|\\.)*")\s*;/.exec(bundle);
+  assert.ok(m, 'GLASS_MERIDIAN_SCRIPT assignment not found in the bundle');
+  assert.equal(JSON.parse(m[1]), SCRIPT, 'Bundled script is stale; run npm run build:bundle');
+});
+
+test('Keyboard: Enter and Space on a focused dock button do not advance the story', function () {
+  const env = buildMockEnv();
+  env.app.startNewGame();
+  const line1 = env.doc.getElementById('dialogue-text').textContent;
+  env.doc.getElementById('act-save').focus();
+  env.win.dispatchKey('Enter');
+  env.win.dispatchKey(' ');
+  assert.equal(env.doc.getElementById('dialogue-text').textContent, line1);
+  assert.equal(env.doc.getElementById('dlg-slots').open, false);
+
+  env.doc.activeElement = null;
+  env.win.dispatchKey('Enter');
+  assert.notEqual(env.doc.getElementById('dialogue-text').textContent, line1);
+});
+
+test('Keyboard: single-character shortcuts can be switched off in settings', function () {
+  const env = buildMockEnv();
+  env.app.startNewGame();
+  const line1 = env.doc.getElementById('dialogue-text').textContent;
+
+  const hotkeysCheck = env.doc.getElementById('set-hotkeys');
+  hotkeysCheck.checked = false;
+  hotkeysCheck.dispatchChange();
+  assert.equal(env.app.state.settings.hotkeys, false);
+
+  env.win.dispatchKey(' ');
+  env.win.dispatchKey('h');
+  assert.equal(env.doc.getElementById('dialogue-text').textContent, line1);
+  assert.equal(env.doc.getElementById('dlg-history').open, false);
+
+  while (env.app.state.runtime.current.type !== 'menu') env.app.handleAdvance();
+  env.win.dispatchKey('1');
+  assert.equal(env.app.state.runtime.st.vars.trust_score, 0);
+
+  env.app.pickChoice(0);
+  const afterPick = env.doc.getElementById('dialogue-text').textContent;
+  env.win.dispatchKey('Enter');
+  assert.notEqual(env.doc.getElementById('dialogue-text').textContent, afterPick);
+  assert.match(env.store['glass-meridian:settings'], /"hotkeys":false/);
+});
+
+test('Keyboard: inspector tabs answer Arrow and Home/End keys', function () {
+  const env = buildMockEnv();
+  env.app.showScreen('inspector');
+  const tabAudit = env.doc.getElementById('tab-audit');
+  const tabGraph = env.doc.getElementById('tab-graph');
+  const tabEndings = env.doc.getElementById('tab-endings');
+
+  tabAudit.dispatchKey('ArrowRight');
+  assert.equal(tabGraph.getAttribute('aria-selected'), 'true');
+  assert.equal(env.doc.getElementById('panel-graph').hidden, false);
+  assert.equal(env.doc.activeElement, tabGraph);
+
+  tabGraph.dispatchKey('ArrowRight');
+  assert.equal(tabEndings.getAttribute('aria-selected'), 'true');
+  tabGraph.dispatchKey('Home');
+  assert.equal(tabAudit.getAttribute('aria-selected'), 'true');
+  tabAudit.dispatchKey('End');
+  assert.equal(tabEndings.getAttribute('aria-selected'), 'true');
+  tabEndings.dispatchKey('ArrowRight');
+  assert.equal(tabAudit.getAttribute('aria-selected'), 'true');
+});
+
+test('Dialogs: opening a modal pauses auto and skip so the story cannot run behind it', function () {
+  const env = buildMockEnv();
+  env.app.startNewGame();
+  env.doc.getElementById('act-auto').click();
+  assert.equal(env.app.state.autoMode, true);
+  env.app.openHistoryDialog();
+  assert.equal(env.app.state.autoMode, false);
+  assert.equal(env.app.state.skipMode, false);
+
+  const line = env.doc.getElementById('dialogue-text').textContent;
+  env.app.state.autoMode = true;
+  env.app.handleAdvance();
+  assert.equal(env.doc.getElementById('dialogue-text').textContent, line);
+});
+
+test('Storage: one corrupt localStorage key does not discard the other keys', function () {
+  const env = buildMockEnv({
+    store: {
+      'glass-meridian:persistent': '{not json',
+      'glass-meridian:seen': '{also broken',
+      'glass-meridian:settings': JSON.stringify({ cps: 90, hotkeys: false }),
+      'glass-meridian:slots': JSON.stringify([{ label: 'kept' }, null, null, null, null, null])
+    }
+  });
+  assert.equal(env.app.state.settings.cps, 90);
+  assert.equal(env.app.state.settings.hotkeys, false);
+  assert.equal(env.app.state.slots[0].label, 'kept');
+});
+
+test('Storage: malformed save slot reports an error instead of crashing the dialog', function () {
+  const env = buildMockEnv();
+  env.app.startNewGame();
+  env.app.state.slots[0] = 42;
+  env.app.state.slots[1] = {
+    format: 'glass-meridian-save',
+    version: 1,
+    checkpoints: [{ pc: { label: 'start', ip: 0 } }]
+  };
+  env.app.openSlotsDialog('load');
+  const slotsEl = env.doc.getElementById('slots');
+  const noteEl = env.doc.getElementById('slots-note');
+
+  slotsEl.children[0].children[0].click();
+  assert.match(noteEl.textContent, /Could not load this slot/);
+  assert.equal(env.doc.getElementById('dlg-slots').open, true);
+
+  slotsEl.children[1].children[0].click();
+  assert.match(noteEl.textContent, /Could not load this slot/);
+  assert.equal(env.app.state.screen, 'play');
+});
+
+test('Wipe: erase progress needs a second confirming click', function () {
+  const env = buildMockEnv();
+  env.app.state.slots[0] = { label: 'keep-me' };
+  const wipeBtn = env.doc.getElementById('btn-wipe');
+  wipeBtn.click();
+  assert.equal(env.app.state.slots[0].label, 'keep-me');
+  assert.equal(wipeBtn.getAttribute('data-armed'), 'yes');
+  wipeBtn.click();
+  assert.equal(env.app.state.slots[0], null);
+  assert.equal(wipeBtn.getAttribute('data-armed'), null);
+});
+
+test('Start: with no script loaded, New Expedition shows a menu error instead of throwing', function () {
+  const env = buildMockEnv({ script: '' });
+  env.doc.getElementById('action-new').click();
+  assert.equal(env.app.state.screen, 'menu');
+  const errEl = env.doc.getElementById('menu-error');
+  assert.equal(errEl.hidden, false);
+  assert.match(errEl.textContent, /script did not load/);
+});
+
+test('Stage: speaker badge takes the character color= from the script', function () {
+  const env = buildMockEnv();
+  env.app.startNewGame();
+  const speaker = env.doc.getElementById('speaker');
+  for (let i = 0; i < 60 && speaker.hidden; i++) env.app.handleAdvance();
+  assert.equal(speaker.hidden, false);
+  assert.equal(speaker.getAttribute('data-tinted'), 'yes');
+  assert.match(speaker.style.getPropertyValue('--speaker-color'), /^#/);
 });

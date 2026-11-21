@@ -12,7 +12,7 @@
 2. **Browser Runtime (`engine.js` + `app.js`)**:
    - `engine.js` implements a deterministic lexer, recursive-descent expression parser, statement compiler, state machine, and state-space verifier in pure JavaScript with zero external dependencies and no `eval()` or `Function()`.
    - `assets/script-bundle.js` (generated from `game/script.rpy` via `scripts/build-bundle.js`) exposes `window.GLASS_MERIDIAN_SCRIPT` so `index.html` works out of the box both over HTTP (`https://aariv.me/storyboard-vn/`) and when opened directly from disk (`file://`), with `fetch('game/script.rpy')` as a fallback.
-   - `app.js` binds the runtime to the DOM in `index.html`, rendering the layered SVG stage, typewriter dialogue, guarded choice buttons, 6-slot `localStorage` save system, 200-step rollback stack, live narrative DAG drawer, Ending Gallery, and live Script & DAG Inspector.
+   - `app.js` binds the runtime to the DOM in `index.html`, rendering the layered SVG stage, typewriter dialogue, guarded choice buttons, 6-slot `localStorage` save system, 200-step rollback stack, live narrative map drawer, Ending Gallery, and live Script & Story Graph Inspector.
 
 ## Static Verification and State-Space Exploration
 
@@ -29,7 +29,7 @@ When `engine.js` audits a script (`StoryEngine.auditScript(source)`), it runs tw
    - Because each transition in the BFS is a single player menu choice, the first time an `ending_*` label is reached yields the provably shortest choice route to that ending.
    - Flags any ending that is guarded by mutually exclusive conditions (`ending-locked`) and any menu choice whose guard never evaluates to true (`choice-never-offered`).
 
-In `game/script.rpy`, the verifier explores 500 distinct interaction states across 30 labels and 44 edges, reports 0 issues, and shows that all 4 endings (`Meridian Restored`, `Silent Observatory`, `Tidal Accord`, and `Glass Fracture`) are reachable in 5 to 6 choices. These numbers were printed by `StoryEngine.auditScript` on 2026-10-25 (an earlier version of this note gave 109 states, 21 labels and 29 edges, which did not match the script). The archive menu loops back to itself, so the story graph has one choice loop and is not strictly acyclic, even though the page calls it a DAG.
+In `game/script.rpy`, the verifier explores 500 distinct interaction states across 30 labels and 44 edges, reports 0 issues, and shows that all 4 endings (`Meridian Restored`, `Silent Observatory`, `Tidal Accord`, and `Glass Fracture`) are reachable in 5 to 6 choices. These numbers were printed by `StoryEngine.auditScript` on 2026-10-25 (an earlier version of this note gave 109 states, 21 labels and 29 edges, which did not match the script). The archive menu loops back to itself, so the story graph has one choice loop and is not strictly acyclic, which is why the page calls it a story graph rather than a DAG.
 
 ## Ren'Py check
 
