@@ -30,6 +30,7 @@ This repository is structured as both a valid Ren'Py 8 desktop project and a sta
 - **Desktop Ren'Py 8 (`game/`)**: Open the repository folder in the Ren'Py 8 Launcher and click **Launch Project**. It uses `game/script.rpy`, `game/screens.rpy`, `game/options.rpy`, `game/gui.rpy`, and the 18 vector assets in `game/images/`.
 - **Browser Runtime (`index.html`, `engine.js`, `app.js`, `styles.css`)**: Parses `game/script.rpy` directly in JavaScript without `eval()`, executing `define`, `default`, `image`, `label`, `scene`, `show`, `hide`, `with`, `menu` (with `if` guards), `$ var = expr` mutations, `if / elif / else` branches, `jump`, `call`, and `return`.
 - **Script & Story Graph Inspector**: Built into the web interface. Performs static control-flow analysis, Tarjan strongly connected component cycle detection, and breadth-first state-space exploration over `game/script.rpy` (or any custom Ren'Py script you type into the live editor) to prove that all labels and endings are reachable and to compute the shortest choice sequence to each ending.
+- **State-Space & Reachability Lab (`narrative-lab.js`)**: A deterministic analysis surface that enumerates every distinct playthrough (874 on the shipped script), compares all four endings by reachability, shortest route, path count, share and terminal `trust_score` / `calibration_drift` / `lens_unlocked` ranges, ranks pivotal choice menus by branch-flip leverage, and stamps one pure-JS FIPS 180-4 SHA-256 proof digest reused identically across the on-page fingerprint, JSON export, formula-safe CSV provenance header and Markdown footer. Exports, a tamper-detection demo, a `16+`-check in-page self-test runner, shortest-route replay, and `#gm=` share-link bookmarks are all built in.
 
 ## Features in the Browser Edition
 
@@ -48,7 +49,7 @@ Requires Node.js 18+:
 npm test
 ```
 
-This runs 68 unit and DOM smoke tests (`tests/engine.test.js` and `tests/dom-smoke.test.js`) via `node --test`.
+This runs 520 unit and DOM smoke tests (`tests/engine.test.js`, `tests/dom-smoke.test.js`, and `tests/narrative-lab.test.js`) via `node --test`.
 
 ### 2. Play in a browser
 

@@ -200,7 +200,13 @@ function buildMockEnv(opts) {
     'btn-reset', 'btn-copy', 'btn-play-script',
     'dlg-history', 'backlog', 'dlg-slots', 'dlg-slots-title', 'slots', 'slots-note',
     'dlg-settings', 'set-speed', 'set-speed-out', 'set-locked', 'set-parallax', 'set-hotkeys',
-    'btn-wipe', 'menu-error'
+    'btn-wipe', 'menu-error',
+    'screen-lab', 'menu-item-lab', 'lab-menu-hint', 'lab-note', 'lab-stats',
+    'lab-table-body', 'lab-phase', 'lab-phase-legend', 'lab-leverage', 'lab-pivot-detail',
+    'lab-digest', 'lab-verify-out', 'lab-route-status', 'lab-tests-summary', 'lab-test-list',
+    'lab-panel-reach', 'lab-panel-phase', 'lab-panel-leverage', 'lab-panel-export', 'lab-panel-tests',
+    'lab-step-route', 'lab-exp-json', 'lab-exp-csv', 'lab-exp-md', 'lab-copy-link',
+    'lab-verify', 'lab-run-tests'
   ];
   ids.forEach(function (id) {
     const tag = id.indexOf('dlg-') === 0 ? 'dialog' : id === 'src-editor' ? 'textarea' : 'div';
@@ -208,7 +214,7 @@ function buildMockEnv(opts) {
     el.setAttribute('id', id);
   });
 
-  ['new', 'continue', 'gallery', 'inspector', 'menu'].forEach(function (action) {
+  ['new', 'continue', 'gallery', 'inspector', 'lab', 'menu'].forEach(function (action) {
     const b = doc.createElement('button');
     b.setAttribute('data-action', action);
     b.setAttribute('id', 'action-' + action);
@@ -845,4 +851,121 @@ test('Stage: speaker badge takes the character color= from the script', function
   assert.equal(speaker.hidden, false);
   assert.equal(speaker.getAttribute('data-tinted'), 'yes');
   assert.match(speaker.style.getPropertyValue('--speaker-color'), /^#/);
+});
+
+/* ------------------------------------------------------------------ */
+/* 4. State-Space & Reachability Lab integration                       */
+/* ------------------------------------------------------------------ */
+
+test('Lab: menu item is visible and navigates to the lab screen', function () {
+  const env = buildMockEnv();
+  const item = env.doc.getElementById('menu-item-lab');
+  assert.equal(item.hidden, false);
+  env.doc.getElementById('action-lab').click();
+  assert.equal(env.app.state.screen, 'lab');
+  assert.equal(env.doc.getElementById('screen-lab').hidden, false);
+});
+
+test('Lab: renders stats strip, comparator rows, digest, phase plane and leverage list', function () {
+  const env = buildMockEnv();
+  env.doc.getElementById('action-lab').click();
+  const stats = env.doc.getElementById('lab-stats');
+  assert.equal(stats.children.length, 6);
+  const rows = env.doc.getElementById('lab-table-body').children;
+  assert.equal(rows.length, 4);
+  const endings = rows.map(function (r) { return r.getAttribute('data-ending'); }).sort();
+  assert.deepEqual(endings, [
+    'ending_glass_fracture', 'ending_meridian_restored',
+    'ending_silent_observatory', 'ending_tidal_accord'
+  ]);
+  assert.match(env.doc.getElementById('lab-digest').textContent, /^[0-9a-f]{64}$/);
+  const phase = env.doc.getElementById('lab-phase');
+  const svg = phase.children[0];
+  assert.ok(svg, 'phase svg missing');
+  const dots = phase.children[0].children.filter(function (n) {
+    return (n.getAttribute('class') || '').indexOf('lab-dot') === 0;
+  });
+  assert.ok(dots.length > 0, 'no phase markers');
+  const lev = env.doc.getElementById('lab-leverage');
+  assert.equal(lev.children.length, 5);
+  const note = env.doc.getElementById('lab-note');
+  assert.match(note.textContent, /playthroughs/);
+  assert.match(note.textContent, /4 of 4 endings reachable/);
+});
+
+test('Lab: clicking a comparator row selects the ending and reports its route', function () {
+  const env = buildMockEnv();
+  env.doc.getElementById('action-lab').click();
+  const rows = env.doc.getElementById('lab-table-body').children;
+  const tidal = rows.find(function (r) { return r.getAttribute('data-ending') === 'ending_tidal_accord'; });
+  tidal.click();
+  assert.equal(env.app.state.lab.selEnding, 'ending_tidal_accord');
+  const refreshed = env.doc.getElementById('lab-table-body').children.find(function (r) {
+    return r.getAttribute('data-ending') === 'ending_tidal_accord';
+  });
+  assert.match(refreshed.getAttribute('class'), /sel/);
+  const status = env.doc.getElementById('lab-route-status');
+  assert.match(status.textContent, /shortest route is 5 choices/);
+});
+
+test('Lab: verify button confirms clean digest and catches a forged payload', function () {
+  const env = buildMockEnv();
+  env.doc.getElementById('action-lab').click();
+  env.doc.getElementById('lab-verify').click();
+  const out = env.doc.getElementById('lab-verify-out');
+  assert.match(out.textContent, /sha-256 match/);
+  assert.match(out.textContent, /caught/);
+  assert.match(out.getAttribute('class'), /ok/);
+});
+
+test('Lab: in-page self-test runner passes all deterministic checks', function () {
+  const env = buildMockEnv();
+  env.doc.getElementById('action-lab').click();
+  env.doc.getElementById('lab-run-tests').click();
+  const sum = env.doc.getElementById('lab-tests-summary');
+  assert.match(sum.textContent, /^(\d+) of \1 self-tests passing$/);
+  const items = env.doc.getElementById('lab-test-list').children;
+  assert.ok(items.length >= 16, 'expected at least 16 self-tests, got ' + items.length);
+  const failures = items.filter(function (li) { return li.getAttribute('class') === 'fail'; });
+  assert.equal(failures.length, 0);
+});
+
+test('Lab: copy share link writes a #gm= bookmark URL to the clipboard', async function () {
+  const env = buildMockEnv();
+  env.doc.getElementById('action-lab').click();
+  env.doc.getElementById('lab-copy-link').click();
+  await Promise.resolve();
+  assert.match(env.win.navigator.clipboard._copied, /#gm=/);
+});
+
+test('Lab: step shortest route replays the ending through the live runtime', async function () {
+  const env = buildMockEnv();
+  env.doc.getElementById('action-lab').click();
+  env.app.state.lab.replayMs = 1;
+  const rows = env.doc.getElementById('lab-table-body').children;
+  const tidal = rows.find(function (r) { return r.getAttribute('data-ending') === 'ending_tidal_accord'; });
+  tidal.click();
+  env.doc.getElementById('lab-step-route').click();
+  assert.equal(env.app.state.screen, 'play');
+  const deadline = Date.now() + 5000;
+  let cur = null;
+  while (Date.now() < deadline) {
+    cur = env.app.state.runtime && env.app.state.runtime.current;
+    if (cur && (cur.type === 'end' || cur.type === 'error')) break;
+    await new Promise(function (r) { setTimeout(r, 15); });
+  }
+  assert.ok(cur, 'runtime missing');
+  assert.equal(cur.type, 'end');
+  assert.equal(cur.ending.label, 'ending_tidal_accord');
+});
+
+test('Lab: leverage row selection updates the pivot detail panel', function () {
+  const env = buildMockEnv();
+  env.doc.getElementById('action-lab').click();
+  const lev = env.doc.getElementById('lab-leverage');
+  const first = lev.children[0].children[0];
+  first.click();
+  const detail = env.doc.getElementById('lab-pivot-detail');
+  assert.ok(detail.children.length >= 2, 'pivot detail should list options');
+  assert.match(env.app.state.lab.selPivot, /scene5_calibration/);
 });

@@ -11,6 +11,7 @@
   'use strict';
 
   var Engine = root.StoryEngine || (typeof require === 'function' ? require('./engine.js') : null);
+  var Lab = root.NarrativeLab || (typeof require === 'function' ? require('./narrative-lab.js') : null);
   var STORAGE_PREFIX = 'glass-meridian:';
   var SLOT_COUNT = 6;
   var SVG_NS = 'http://www.w3.org/2000/svg';
@@ -89,7 +90,18 @@
         ending_glass_fracture: false
       },
       seen: {},
-      slots: [null, null, null, null, null, null]
+      slots: [null, null, null, null, null, null],
+      lab: {
+        report: null,
+        selEnding: null,
+        selPivot: null,
+        view: null,
+        tests: null,
+        replayTimer: null,
+        replayAdvancing: false,
+        replaySteps: null,
+        replayIndex: 0
+      }
     };
 
     function byId(id) {
@@ -215,13 +227,15 @@
     function showScreen(name) {
       stopAutoAndSkip();
       stopTypewriter(true);
+      stopLabReplay();
       state.screen = name;
       if (doc.body) doc.body.setAttribute('data-screen', name);
       var map = {
         menu: byId('screen-menu'),
         play: byId('screen-play'),
         gallery: byId('screen-gallery'),
-        inspector: byId('screen-inspector')
+        inspector: byId('screen-inspector'),
+        lab: byId('screen-lab')
       };
       Object.keys(map).forEach(function (k) {
         if (map[k]) map[k].hidden = k !== name;
@@ -237,6 +251,8 @@
           editor.value = state.activeSource || state.canonicalSource;
         }
         runInspectorAudit();
+      } else if (name === 'lab') {
+        renderLab();
       }
     }
 
@@ -581,6 +597,7 @@
     }
 
     function handleAdvance() {
+      if (!state.lab.replayAdvancing) stopLabReplay();
       if (!state.runtime || state.screen !== 'play') return;
       if (doc.querySelector && doc.querySelector('dialog[open]')) return;
       if (state.isTyping) {
@@ -595,6 +612,7 @@
     }
 
     function pickChoice(choiceIndex) {
+      if (!state.lab.replayAdvancing) stopLabReplay();
       if (!state.runtime || !state.runtime.current || state.runtime.current.type !== 'menu') return;
       var ev = Engine.chooseMenuOption(state.runtime, choiceIndex);
       renderPlayEvent(ev);
@@ -1289,6 +1307,598 @@
       return lines.join('\n');
     }
 
+    /* ---------------------------------------------------------------- */
+    /* State-Space & Reachability Lab                                     */
+    /* ---------------------------------------------------------------- */
+
+    var LAB_VIEW_PANELS = {
+      reach: 'lab-panel-reach',
+      phase: 'lab-panel-phase',
+      leverage: 'lab-panel-leverage',
+      export: 'lab-panel-export',
+      tests: 'lab-panel-tests'
+    };
+
+    function labSource() {
+      return state.activeSource || state.canonicalSource;
+    }
+
+    function labEnding(label) {
+      var rep = state.lab.report;
+      if (!rep) return null;
+      for (var i = 0; i < rep.endings.length; i++) {
+        if (rep.endings[i].label === label) return rep.endings[i];
+      }
+      return null;
+    }
+
+    function setLabStatus(id, text, kind) {
+      var el = byId(id);
+      if (!el) return;
+      el.textContent = text;
+      el.className = 'lab-status' + (kind ? ' ' + kind : '');
+    }
+
+    function renderLab() {
+      if (!Lab) return;
+      var rep = Lab.analyzeStory(labSource());
+      state.lab.report = rep;
+      var noteEl = byId('lab-note');
+      if (noteEl) {
+        if (rep && rep.ok) {
+          var reached = rep.endings.filter(function (e) { return e.reachable; }).length;
+          noteEl.textContent = rep.enumeration.paths.length + ' playthroughs | ' +
+            reached + ' of ' + rep.endings.length + ' endings reachable';
+        } else {
+          noteEl.textContent = 'analysis unavailable' + (rep && rep.error ? ': ' + rep.error : '');
+        }
+      }
+      if (!rep) return;
+      if (!labEnding(state.lab.selEnding)) {
+        state.lab.selEnding = rep.endings.length ? rep.endings[0].label : null;
+      }
+      var pivOk = rep.pivots.some(function (p) { return p.key === state.lab.selPivot; });
+      if (!pivOk) state.lab.selPivot = rep.pivots.length ? rep.pivots[0].key : null;
+      renderLabStats(rep);
+      renderLabTable(rep);
+      renderLabPhase(rep);
+      renderLabLeverage(rep);
+      renderLabExport(rep);
+      applyLabView(true);
+      var labHint = byId('lab-menu-hint');
+      if (labHint) {
+        var rCount = rep.endings.filter(function (e) { return e.reachable; }).length;
+        labHint.textContent = rCount + ' of ' + rep.endings.length + ' endings proved';
+      }
+    }
+
+    function renderLabStats(rep) {
+      var el = byId('lab-stats');
+      if (!el) return;
+      el.innerHTML = '';
+      var t = rep.proof.payload.totals;
+      var reachable = rep.endings.filter(function (e) { return e.reachable; }).length;
+      var pivotsWithLeverage = rep.pivots.filter(function (p) { return p.pivotalContexts > 0; }).length;
+      var pairs = [
+        ['Playthroughs', t.playthroughs],
+        ['Endings reachable', reachable + ' of ' + rep.endings.length],
+        ['Pivotal menus', pivotsWithLeverage + ' of ' + rep.pivots.length],
+        ['Choice loops', t.sccCycles],
+        ['Dead ends', t.deadEnds],
+        ['Unreachable labels', t.unreachableLabels]
+      ];
+      pairs.forEach(function (pair) {
+        var div = doc.createElement('div');
+        div.className = 'stat';
+        var dt = doc.createElement('dt');
+        dt.textContent = pair[0];
+        var dd = doc.createElement('dd');
+        dd.textContent = String(pair[1]);
+        div.appendChild(dt);
+        div.appendChild(dd);
+        el.appendChild(div);
+      });
+    }
+
+    function renderLabTable(rep) {
+      var tbody = byId('lab-table-body');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+      rep.endings.forEach(function (e) {
+        var tr = doc.createElement('tr');
+        tr.className = 'lab-row' + (e.label === state.lab.selEnding ? ' sel' : '');
+        tr.setAttribute('tabindex', '0');
+        tr.setAttribute('data-ending', e.label);
+        tr.addEventListener('click', function () { selectLabEnding(e.label); });
+        tr.addEventListener('keydown', function (ev) {
+          if (ev.key === 'Enter' || ev.key === ' ') {
+            ev.preventDefault();
+            selectLabEnding(e.label);
+          }
+        });
+        function td(cls, text) {
+          var c = doc.createElement('td');
+          if (cls) c.className = cls;
+          if (text !== null) c.textContent = text;
+          tr.appendChild(c);
+          return c;
+        }
+        td('lab-end-name', e.title);
+        var badgeCell = td(null, null);
+        var badge = doc.createElement('span');
+        badge.className = 'lab-badge ' + (e.reachable ? 'ok' : 'no');
+        badge.textContent = e.reachable ? 'reachable' : 'unreachable';
+        badgeCell.appendChild(badge);
+        td('lab-mono', e.reachable ? String(e.choiceCount) : '-');
+        td('lab-mono', String(e.pathCount));
+        var shareCell = td(null, null);
+        var share = doc.createElement('span');
+        share.className = 'lab-share';
+        var bar = doc.createElement('span');
+        bar.className = 'lab-share-bar';
+        var fill = doc.createElement('span');
+        fill.className = 'lab-share-fill';
+        fill.style.width = Math.max(0, Math.min(100, e.sharePct)) + '%';
+        bar.appendChild(fill);
+        share.appendChild(bar);
+        var pct = doc.createElement('span');
+        pct.className = 'lab-mono';
+        pct.textContent = e.sharePct.toFixed(1) + '%';
+        share.appendChild(pct);
+        shareCell.appendChild(share);
+        td('lab-mono', e.terminalTrust[0] === null ? '-' : e.terminalTrust[0] + '..' + e.terminalTrust[1]);
+        td('lab-mono', e.terminalDrift[0] === null ? '-' : e.terminalDrift[0] + '..' + e.terminalDrift[1]);
+        td('lab-mono', 'T ' + e.lensUnlockedTerminal + ' | F ' + e.lensLockedTerminal);
+        tbody.appendChild(tr);
+      });
+    }
+
+    function selectLabEnding(label) {
+      if (!labEnding(label)) return;
+      state.lab.selEnding = label;
+      renderLabTable(state.lab.report);
+      renderLabPhase(state.lab.report);
+      var e = labEnding(label);
+      setLabStatus('lab-route-status',
+        e.reachable ? e.title + ': shortest route is ' + e.choiceCount + ' choices' : e.title + ' is unreachable',
+        e.reachable ? 'ok' : 'bad');
+      updateLabHash();
+    }
+
+    function renderLabPhase(rep) {
+      var wrap = byId('lab-phase');
+      var legend = byId('lab-phase-legend');
+      if (!wrap) return;
+      wrap.innerHTML = '';
+      if (legend) legend.innerHTML = '';
+      var W = 560, H = 340, L = 46, R = 14, T = 16, B = 38;
+      var svg = doc.createElementNS(SVG_NS, 'svg');
+      svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+      svg.setAttribute('role', 'img');
+      svg.setAttribute('aria-label', 'Terminal trust versus drift phase plane');
+
+      var clusters = {};
+      var tMin = Infinity, tMax = -Infinity, dMin = Infinity, dMax = -Infinity;
+      rep.endings.forEach(function (e) {
+        e.terminalPoints.forEach(function (p) {
+          if (p.trust === null || p.drift === null) return;
+          var key = e.label + '|' + p.trust + '|' + p.drift + '|' + (p.lens ? 1 : 0);
+          if (!clusters[key]) clusters[key] = { ending: e.label, trust: p.trust, drift: p.drift, lens: p.lens, n: 0 };
+          clusters[key].n++;
+          if (p.trust < tMin) tMin = p.trust;
+          if (p.trust > tMax) tMax = p.trust;
+          if (p.drift < dMin) dMin = p.drift;
+          if (p.drift > dMax) dMax = p.drift;
+        });
+      });
+      var dots = Object.keys(clusters).map(function (k) { return clusters[k]; });
+      if (!dots.length) {
+        var emptyText = doc.createElementNS(SVG_NS, 'text');
+        emptyText.setAttribute('x', String(W / 2));
+        emptyText.setAttribute('y', String(H / 2));
+        emptyText.setAttribute('class', 'lab-axis');
+        emptyText.setAttribute('text-anchor', 'middle');
+        emptyText.textContent = 'No terminal states enumerated.';
+        svg.appendChild(emptyText);
+        wrap.appendChild(svg);
+        return;
+      }
+      if (tMin === tMax) { tMin -= 0.5; tMax += 0.5; }
+      if (dMin === dMax) { dMin -= 0.5; dMax += 0.5; }
+      var tPad = (tMax - tMin) * 0.08;
+      var dPad = (dMax - dMin) * 0.08;
+      var x0 = tMin - tPad, x1 = tMax + tPad;
+      var y0 = dMin - dPad, y1 = dMax + dPad;
+      function px(v) { return L + (v - x0) / (x1 - x0) * (W - L - R); }
+      function py(v) { return H - B - (v - y0) / (y1 - y0) * (H - T - B); }
+
+      var loT = Math.floor(x0), hiT = Math.ceil(x1);
+      var loD = Math.floor(y0), hiD = Math.ceil(y1);
+      for (var ti = loT; ti <= hiT; ti++) {
+        var gx = doc.createElementNS(SVG_NS, 'line');
+        gx.setAttribute('class', 'lab-gridline');
+        gx.setAttribute('x1', String(px(ti)));
+        gx.setAttribute('x2', String(px(ti)));
+        gx.setAttribute('y1', String(T));
+        gx.setAttribute('y2', String(H - B));
+        svg.appendChild(gx);
+        var tx = doc.createElementNS(SVG_NS, 'text');
+        tx.setAttribute('class', 'lab-axis');
+        tx.setAttribute('x', String(px(ti)));
+        tx.setAttribute('y', String(H - B + 16));
+        tx.setAttribute('text-anchor', 'middle');
+        tx.textContent = String(ti);
+        svg.appendChild(tx);
+      }
+      for (var di = loD; di <= hiD; di++) {
+        var gy = doc.createElementNS(SVG_NS, 'line');
+        gy.setAttribute('class', 'lab-gridline');
+        gy.setAttribute('x1', String(L));
+        gy.setAttribute('x2', String(W - R));
+        gy.setAttribute('y1', String(py(di)));
+        gy.setAttribute('y2', String(py(di)));
+        svg.appendChild(gy);
+        var ty = doc.createElementNS(SVG_NS, 'text');
+        ty.setAttribute('class', 'lab-axis');
+        ty.setAttribute('x', String(L - 8));
+        ty.setAttribute('y', String(py(di) + 3));
+        ty.setAttribute('text-anchor', 'end');
+        ty.textContent = String(di);
+        svg.appendChild(ty);
+      }
+      var axX = doc.createElementNS(SVG_NS, 'line');
+      axX.setAttribute('class', 'lab-axisline');
+      axX.setAttribute('x1', String(L));
+      axX.setAttribute('x2', String(W - R));
+      axX.setAttribute('y1', String(H - B));
+      axX.setAttribute('y2', String(H - B));
+      svg.appendChild(axX);
+      var axY = doc.createElementNS(SVG_NS, 'line');
+      axY.setAttribute('class', 'lab-axisline');
+      axY.setAttribute('x1', String(L));
+      axY.setAttribute('x2', String(L));
+      axY.setAttribute('y1', String(T));
+      axY.setAttribute('y2', String(H - B));
+      svg.appendChild(axY);
+      var capX = doc.createElementNS(SVG_NS, 'text');
+      capX.setAttribute('class', 'lab-axis');
+      capX.setAttribute('x', String(W - R));
+      capX.setAttribute('y', String(H - B + 30));
+      capX.setAttribute('text-anchor', 'end');
+      capX.textContent = 'trust_score';
+      svg.appendChild(capX);
+      var capY = doc.createElementNS(SVG_NS, 'text');
+      capY.setAttribute('class', 'lab-axis');
+      capY.setAttribute('x', String(L - 4));
+      capY.setAttribute('y', String(T - 6));
+      capY.setAttribute('text-anchor', 'start');
+      capY.textContent = 'calibration_drift';
+      svg.appendChild(capY);
+
+      dots.forEach(function (d) {
+        var g = doc.createElementNS(SVG_NS, 'g');
+        g.setAttribute('class', 'lab-dot' + (d.ending === state.lab.selEnding ? ' sel' : ' dim') + (d.lens ? '' : ' locked'));
+        g.setAttribute('data-ending', d.ending);
+        g.setAttribute('tabindex', '0');
+        g.setAttribute('role', 'button');
+        var title = doc.createElementNS(SVG_NS, 'title');
+        title.textContent = Engine.endingTitle(d.ending) + ': trust ' + d.trust + ', drift ' + d.drift +
+          ', lens ' + (d.lens ? 'unlocked' : 'locked') + ' (' + d.n + ' playthrough' + (d.n === 1 ? '' : 's') + ')';
+        g.appendChild(title);
+        g.setAttribute('aria-label', title.textContent);
+        var c = doc.createElementNS(SVG_NS, 'circle');
+        c.setAttribute('cx', String(px(d.trust)));
+        c.setAttribute('cy', String(py(d.drift)));
+        c.setAttribute('r', String(5 + Math.min(6, Math.round(Math.log2(d.n + 1) * 1.5))));
+        g.appendChild(c);
+        g.addEventListener('click', function () { selectLabEnding(d.ending); });
+        g.addEventListener('keydown', function (ev) {
+          if (ev.key === 'Enter' || ev.key === ' ') {
+            ev.preventDefault();
+            selectLabEnding(d.ending);
+          }
+        });
+        svg.appendChild(g);
+      });
+      wrap.appendChild(svg);
+
+      if (legend) {
+        rep.endings.forEach(function (e) {
+          var li = doc.createElement('li');
+          var sw = doc.createElement('span');
+          sw.className = 'lab-legend-swatch';
+          sw.setAttribute('data-ending', e.label);
+          li.appendChild(sw);
+          var tx = doc.createElement('span');
+          tx.textContent = e.title;
+          li.appendChild(tx);
+          legend.appendChild(li);
+        });
+        var liLock = doc.createElement('li');
+        var swLock = doc.createElement('span');
+        swLock.className = 'lab-legend-swatch locked';
+        liLock.appendChild(swLock);
+        var txLock = doc.createElement('span');
+        txLock.textContent = 'hollow = lens still locked';
+        liLock.appendChild(txLock);
+        legend.appendChild(liLock);
+      }
+    }
+
+    function renderLabLeverage(rep) {
+      var list = byId('lab-leverage');
+      var detail = byId('lab-pivot-detail');
+      if (!list) return;
+      list.innerHTML = '';
+      if (detail) detail.innerHTML = '';
+      var maxLev = Math.max(1, rep.pivots.reduce(function (m, p) { return Math.max(m, p.leverage); }, 0));
+      rep.pivots.forEach(function (p) {
+        var li = doc.createElement('li');
+        var btn = doc.createElement('button');
+        btn.type = 'button';
+        btn.className = 'lab-lev-row' + (p.key === state.lab.selPivot ? ' sel' : '');
+        btn.setAttribute('data-pivot', p.key);
+        btn.addEventListener('click', function () { selectLabPivot(p.key); });
+
+        var head = doc.createElement('span');
+        head.className = 'lab-lev-head';
+        var nm = doc.createElement('span');
+        nm.textContent = p.label;
+        var meta = doc.createElement('span');
+        meta.className = 'lab-mono';
+        meta.textContent = 'scene ' + (p.scene === null ? '-' : p.scene) + ' | ' + p.leverage + ' flips';
+        head.appendChild(nm);
+        head.appendChild(meta);
+        btn.appendChild(head);
+
+        var bar = doc.createElement('span');
+        bar.className = 'lab-lev-bar';
+        var fill = doc.createElement('span');
+        fill.className = 'lab-lev-fill';
+        fill.style.width = Math.round((p.leverage / maxLev) * 100) + '%';
+        bar.appendChild(fill);
+        btn.appendChild(bar);
+
+        var metaRow = doc.createElement('span');
+        metaRow.className = 'lab-lev-meta';
+        metaRow.textContent = p.visits + ' visits | ' + p.pivotalContexts + ' pivotal | ' +
+          p.options.length + ' options | ' + p.endingsCovered.length + ' endings';
+        btn.appendChild(metaRow);
+
+        li.appendChild(btn);
+        list.appendChild(li);
+      });
+
+      var sel = null;
+      rep.pivots.forEach(function (p) { if (p.key === state.lab.selPivot) sel = p; });
+      if (sel && detail) {
+        sel.options.forEach(function (o) {
+          var div = doc.createElement('div');
+          div.className = 'opt';
+          var b = doc.createElement('b');
+          b.textContent = '"' + o.text + '" | ' + o.paths + ' paths | ' + o.flips + ' flips';
+          div.appendChild(b);
+          var chips = doc.createElement('div');
+          chips.className = 'lab-chips';
+          o.endings.forEach(function (lbl) {
+            var c = doc.createElement('span');
+            c.className = 'lab-chip';
+            c.textContent = Engine.endingTitle(lbl);
+            chips.appendChild(c);
+          });
+          div.appendChild(chips);
+          detail.appendChild(div);
+        });
+      }
+    }
+
+    function selectLabPivot(key) {
+      state.lab.selPivot = key;
+      renderLabLeverage(state.lab.report);
+      updateLabHash();
+    }
+
+    function renderLabExport(rep) {
+      var d = byId('lab-digest');
+      if (d) d.textContent = rep.proof.digest;
+      setLabStatus('lab-verify-out', 'one digest stamped per script; identical across JSON, CSV and Markdown');
+    }
+
+    function downloadText(name, text, mime) {
+      try {
+        if (!win.Blob || !(win.URL || win.webkitURL)) {
+          setLabStatus('lab-verify-out', 'file downloads are unavailable in this context', 'bad');
+          return;
+        }
+        var blob = new win.Blob([text], { type: mime || 'text/plain' });
+        var urlApi = win.URL || win.webkitURL;
+        var url = urlApi.createObjectURL(blob);
+        var a = doc.createElement('a');
+        a.href = url;
+        a.download = name;
+        a.style.display = 'none';
+        doc.body.appendChild(a);
+        a.click();
+        setTimeout(function () {
+          if (a.parentNode) a.parentNode.removeChild(a);
+          urlApi.revokeObjectURL(url);
+        }, 800);
+      } catch (e) {
+        setLabStatus('lab-verify-out', 'download failed: ' + (e && e.message ? e.message : e), 'bad');
+      }
+    }
+
+    function labHashState() {
+      var st = {};
+      if (state.lab.selEnding) st.end = state.lab.selEnding;
+      if (state.lab.selPivot) st.piv = state.lab.selPivot;
+      if (state.lab.view) st.view = state.lab.view;
+      return st;
+    }
+
+    function updateLabHash() {
+      if (!Lab || state.screen !== 'lab') return;
+      var h = Lab.encodeBookmark(labHashState());
+      if (!h) return;
+      try {
+        if (win.history && typeof win.history.replaceState === 'function') {
+          win.history.replaceState(null, '', h);
+        } else if (win.location) {
+          win.location.hash = h;
+        }
+      } catch (e) {
+        /* ignore: hash persistence is a nicety */
+      }
+    }
+
+    function applyLabHash() {
+      if (!Lab || !win.location) return false;
+      var st = Lab.decodeBookmark(win.location.hash || '');
+      if (!st) return false;
+      if (st.end) state.lab.selEnding = st.end;
+      if (st.piv) state.lab.selPivot = st.piv;
+      if (st.view) state.lab.view = st.view;
+      return true;
+    }
+
+    function applyLabView(scroll) {
+      var panelId = LAB_VIEW_PANELS[state.lab.view] || null;
+      doc.querySelectorAll('.lab-panel').forEach(function (p) {
+        p.setAttribute('data-focus', panelId && p.id === panelId ? 'yes' : 'no');
+      });
+      if (scroll !== false && panelId) {
+        var el = byId(panelId);
+        if (el && typeof el.scrollIntoView === 'function') {
+          el.scrollIntoView({ block: 'start' });
+        }
+      }
+    }
+
+    function copyLabLink() {
+      var h = Lab.encodeBookmark(labHashState());
+      if (!h) {
+        setLabStatus('lab-verify-out', 'current state cannot be encoded into a link', 'bad');
+        return;
+      }
+      var base = (win.location && win.location.href ? win.location.href.split('#')[0] : '');
+      var link = base + h;
+      if (win.navigator && win.navigator.clipboard && typeof win.navigator.clipboard.writeText === 'function') {
+        win.navigator.clipboard.writeText(link).then(function () {
+          setLabStatus('lab-verify-out', 'share link copied: ' + h, 'ok');
+        }, function () {
+          setLabStatus('lab-verify-out', 'clipboard denied; link is ' + link, 'bad');
+        });
+      } else {
+        setLabStatus('lab-verify-out', 'copy manually: ' + link);
+      }
+    }
+
+    function runLabVerify() {
+      var rep = state.lab.report;
+      if (!rep) return;
+      var clean = Lab.verifyProof(rep.proof);
+      var forged = Lab.tamperProof(rep.proof);
+      var tampered = Lab.verifyProof(forged);
+      var out = byId('lab-verify-out');
+      if (!out) return;
+      if (clean.ok && !tampered.ok) {
+        out.className = 'lab-status ok';
+        out.textContent = 'clean payload: sha-256 match | forged payload: caught (' + tampered.reason + ')';
+      } else {
+        out.className = 'lab-status bad';
+        out.textContent = 'unexpected result: clean=' + (clean.ok ? 'ok' : clean.reason) +
+          ' forged=' + (tampered.ok ? 'not caught' : tampered.reason);
+      }
+    }
+
+    function runLabTests() {
+      var list = byId('lab-test-list');
+      var sum = byId('lab-tests-summary');
+      if (!list) return;
+      list.innerHTML = '';
+      if (sum) {
+        sum.className = 'lab-status';
+        sum.textContent = 'running deterministic self-tests...';
+      }
+      var results = Lab.runSelfTests(labSource());
+      state.lab.tests = results;
+      var pass = results.filter(function (r) { return r.pass; }).length;
+      if (sum) {
+        sum.className = 'lab-status ' + (pass === results.length ? 'ok' : 'bad');
+        sum.textContent = pass + ' of ' + results.length + ' self-tests passing';
+      }
+      results.forEach(function (r) {
+        var li = doc.createElement('li');
+        li.className = r.pass ? 'pass' : 'fail';
+        var id = doc.createElement('span');
+        id.className = 'tid';
+        id.textContent = r.id;
+        var name = doc.createElement('span');
+        name.textContent = (r.pass ? 'PASS ' : 'FAIL ') + r.name + ' (' + r.detail + ')';
+        li.appendChild(id);
+        li.appendChild(name);
+        list.appendChild(li);
+      });
+    }
+
+    function stopLabReplay() {
+      if (state.lab.replayTimer) {
+        clearInterval(state.lab.replayTimer);
+        state.lab.replayTimer = null;
+      }
+      state.lab.replayAdvancing = false;
+      state.lab.replaySteps = null;
+      state.lab.replayIndex = 0;
+    }
+
+    function stepShortestRoute() {
+      var rep = state.lab.report;
+      if (!rep) return;
+      var e = labEnding(state.lab.selEnding) || rep.endings[0] || null;
+      if (!e || !e.reachable || !e.shortestChoices || !e.shortestChoices.length) {
+        setLabStatus('lab-route-status', 'no playable route is recorded for this ending', 'bad');
+        return;
+      }
+      setLabStatus('lab-route-status', 'replaying shortest route to ' + e.title + '...', 'ok');
+      var steps = e.shortestChoices.slice();
+      startNewGame(labSource());
+      state.lab.replaySteps = steps;
+      state.lab.replayIndex = 0;
+      state.lab.replayTimer = setInterval(replayTick, state.lab.replayMs || 240);
+    }
+
+    function replayTick() {
+      var rt = state.runtime;
+      var steps = state.lab.replaySteps;
+      if (!rt || !steps || state.screen !== 'play') {
+        stopLabReplay();
+        return;
+      }
+      var cur = rt.current;
+      if (!cur) {
+        stopLabReplay();
+        return;
+      }
+      state.lab.replayAdvancing = true;
+      try {
+        if (cur.type === 'say') {
+          handleAdvance();
+        } else if (cur.type === 'menu') {
+          var step = steps[state.lab.replayIndex];
+          if (!step) {
+            stopLabReplay();
+            return;
+          }
+          state.lab.replayIndex++;
+          pickChoice(step.index);
+        } else {
+          stopLabReplay();
+        }
+      } finally {
+        state.lab.replayAdvancing = false;
+      }
+    }
+
     function bindEvents() {
       doc.querySelectorAll('[data-action]').forEach(function (btn) {
         btn.addEventListener('click', function () {
@@ -1297,6 +1907,7 @@
           else if (action === 'continue') openSlotsDialog('load');
           else if (action === 'gallery') showScreen('gallery');
           else if (action === 'inspector') showScreen('inspector');
+          else if (action === 'lab') { if (Lab) showScreen('lab'); }
           else if (action === 'menu') showScreen('menu');
         });
       });
@@ -1479,6 +2090,29 @@
         });
       });
 
+      if (Lab) {
+        var stepBtn = byId('lab-step-route');
+        if (stepBtn) stepBtn.addEventListener('click', function () { stepShortestRoute(); });
+        var expJson = byId('lab-exp-json');
+        if (expJson) expJson.addEventListener('click', function () {
+          if (state.lab.report) downloadText('glass-meridian-proof.json', Lab.exportJson(state.lab.report.proof), 'application/json');
+        });
+        var expCsv = byId('lab-exp-csv');
+        if (expCsv) expCsv.addEventListener('click', function () {
+          if (state.lab.report) downloadText('glass-meridian-proof.csv', Lab.exportCsv(state.lab.report.proof), 'text/csv');
+        });
+        var expMd = byId('lab-exp-md');
+        if (expMd) expMd.addEventListener('click', function () {
+          if (state.lab.report) downloadText('glass-meridian-proof.md', Lab.exportMarkdown(state.lab.report.proof), 'text/markdown');
+        });
+        var copyLinkBtn = byId('lab-copy-link');
+        if (copyLinkBtn) copyLinkBtn.addEventListener('click', function () { copyLabLink(); });
+        var verifyBtn = byId('lab-verify');
+        if (verifyBtn) verifyBtn.addEventListener('click', function () { runLabVerify(); });
+        var testsBtn = byId('lab-run-tests');
+        if (testsBtn) testsBtn.addEventListener('click', function () { runLabTests(); });
+      }
+
       /* On a phone the dialogue box grows with the line, and the choices sit just above it. */
       var stageWrapEl = byId('stage-wrap');
       var dialogueBox = byId('dialogue');
@@ -1606,6 +2240,16 @@
       }
       bindEvents();
       updateMenuHints();
+      var labMenuItem = byId('menu-item-lab');
+      if (labMenuItem) labMenuItem.hidden = !Lab;
+      var labScreen = byId('screen-lab');
+      if (labScreen && !Lab) labScreen.hidden = true;
+      if (Lab && win.addEventListener) {
+        win.addEventListener('hashchange', function () {
+          if (applyLabHash()) showScreen('lab');
+        });
+      }
+      if (applyLabHash()) showScreen('lab');
       return api;
     }
 

@@ -79,6 +79,13 @@
                 <span class="menu-hint">audit the .rpy</span>
               </button>
             </li>
+            <li id="menu-item-lab">
+              <button type="button" class="menu-item" data-action="lab">
+                <span class="menu-idx">05</span>
+                <span class="menu-label">State-Space &amp; Reachability Lab</span>
+                <span class="menu-hint" id="lab-menu-hint">every playthrough, proved</span>
+              </button>
+            </li>
           </ol>
         </nav>
         <p class="menu-error" id="menu-error" role="alert" hidden></p>
@@ -220,6 +227,91 @@
         </div>
       </div>
     </section>
+
+    <section id="screen-lab" class="screen screen-lab" aria-labelledby="lab-title" hidden>
+      <header class="bar">
+        <button type="button" class="btn btn-quiet" data-action="menu">
+          <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-home"/></svg><span>Main Menu</span>
+        </button>
+        <h2 id="lab-title" class="bar-title">State-Space &amp; Reachability Lab</h2>
+        <p class="bar-note" id="lab-note">not analyzed</p>
+      </header>
+      <div class="lab-body">
+        <div class="lab-inner">
+          <dl class="stats lab-stats" id="lab-stats"></dl>
+          <div class="lab-grid">
+            <section class="lab-panel lab-panel-reach" id="lab-panel-reach" aria-labelledby="lab-reach-title">
+            <h3 id="lab-reach-title" class="lab-h">Ending reachability &amp; path share</h3>
+            <div class="lab-tablewrap">
+              <table class="lab-table" id="lab-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Ending</th>
+                    <th scope="col">Reachable</th>
+                    <th scope="col">Shortest</th>
+                    <th scope="col">Paths</th>
+                    <th scope="col">Share</th>
+                    <th scope="col">trust_score</th>
+                    <th scope="col">calibration_drift</th>
+                    <th scope="col">lens_unlocked</th>
+                  </tr>
+                </thead>
+                <tbody id="lab-table-body"></tbody>
+              </table>
+            </div>
+            <div class="lab-actions">
+              <button type="button" class="btn btn-primary" id="lab-step-route">
+                <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-play"/></svg><span>Step shortest route</span>
+              </button>
+              <span class="lab-status" id="lab-route-status" role="status"></span>
+            </div>
+          </section>
+          <section class="lab-panel" id="lab-panel-phase" aria-labelledby="lab-phase-title">
+            <h3 id="lab-phase-title" class="lab-h">Terminal phase plane</h3>
+            <div class="lab-chart" id="lab-phase" role="group" aria-label="Terminal variable phase plane"></div>
+            <ul class="lab-legend" id="lab-phase-legend" aria-label="Ending colors"></ul>
+          </section>
+          <section class="lab-panel" id="lab-panel-leverage" aria-labelledby="lab-pivot-title">
+            <h3 id="lab-pivot-title" class="lab-h">Pivotal-choice leverage</h3>
+            <ol class="lab-leverage" id="lab-leverage"></ol>
+            <div class="lab-pivot-detail" id="lab-pivot-detail" aria-live="polite"></div>
+          </section>
+          <section class="lab-panel" id="lab-panel-export" aria-labelledby="lab-export-title">
+            <h3 id="lab-export-title" class="lab-h">Audited export</h3>
+            <p class="lab-fingerprint"><code id="lab-digest">not computed</code></p>
+            <div class="lab-export">
+              <button type="button" class="btn" id="lab-exp-json">
+                <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg><span>JSON</span>
+              </button>
+              <button type="button" class="btn" id="lab-exp-csv">
+                <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg><span>CSV</span>
+              </button>
+              <button type="button" class="btn" id="lab-exp-md">
+                <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg><span>Markdown</span>
+              </button>
+              <button type="button" class="btn" id="lab-copy-link">
+                <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-copy"/></svg><span>Copy share link</span>
+              </button>
+              <button type="button" class="btn" id="lab-verify">
+                <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-check"/></svg><span>Verify / tamper demo</span>
+              </button>
+            </div>
+            <p class="lab-status" id="lab-verify-out" role="status"></p>
+          </section>
+          <section class="lab-panel" id="lab-panel-tests" aria-labelledby="lab-tests-title">
+            <h3 id="lab-tests-title" class="lab-h">Deterministic self-tests</h3>
+            <div class="lab-export">
+              <button type="button" class="btn btn-primary" id="lab-run-tests">
+                <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-play"/></svg><span>Run self-tests</span>
+              </button>
+            </div>
+              <p class="lab-status" id="lab-tests-summary" role="status"></p>
+              <ol class="lab-test-list" id="lab-test-list"></ol>
+            </section>
+          </div>
+        </div>
+      </div>
+    </section>
   </main>
 
   <dialog class="dlg" id="dlg-history" aria-labelledby="dlg-history-title">
@@ -286,6 +378,7 @@
 
   <script src="engine.js"></script>
   <script src="assets/script-bundle.js"></script>
+  <script src="narrative-lab.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
