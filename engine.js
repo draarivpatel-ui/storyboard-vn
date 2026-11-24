@@ -1329,11 +1329,16 @@
       }
       if (!Array.isArray(snap.stack) ||
           !snap.vars || typeof snap.vars !== 'object' || Array.isArray(snap.vars) ||
-          !snap.stage || typeof snap.stage !== 'object' || Array.isArray(snap.stage) ||
-          typeof snap.historyLength !== 'number' || typeof snap.choicesLength !== 'number' ||
-          typeof snap.trailLength !== 'number') {
+          !snap.stage || typeof snap.stage !== 'object' || Array.isArray(snap.stage)) {
         throw new StoryError('This save slot is damaged');
       }
+      [['historyLength', save.history], ['choicesLength', save.choicesMade], ['trailLength', save.trail]].forEach(function (pair) {
+        var n = snap[pair[0]];
+        var max = Array.isArray(pair[1]) ? pair[1].length : 0;
+        if (!Number.isSafeInteger(n) || n < 0 || n > max) {
+          throw new StoryError('This save slot is damaged');
+        }
+      });
     });
     var last = save.checkpoints[save.checkpoints.length - 1];
     var rt = createStoryRuntime(program, { persistent: save.persistent, visited: save.visited, seen: opts.seen });

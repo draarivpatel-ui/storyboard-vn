@@ -548,6 +548,33 @@ test('Runtime: restoreSaveSlot rejects type-confused saves instead of crashing l
   assert.equal(restored.current.text, rt.current.text);
 });
 
+test('Runtime: restoreSaveSlot rejects out-of-range history counters as damaged saves', function () {
+  const prog = Engine.parseRenpyScript(CANONICAL_SOURCE);
+  const rt = Engine.createStoryRuntime(prog);
+  Engine.advanceStory(rt);
+  const good = Engine.serializeSaveSlot(rt, { slot: 1 });
+  const corrupt = function (mutate) {
+    const s = JSON.parse(JSON.stringify(good));
+    mutate(s);
+    return s;
+  };
+  const lastSnap = function (s) { return s.checkpoints[s.checkpoints.length - 1]; };
+
+  for (const bad of [-1, 1.5, NaN, Infinity, s => s.checkpoints[s.checkpoints.length - 1].historyLength + 999999]) {
+    assert.throws(function () {
+      Engine.restoreSaveSlot(prog, corrupt(function (s) {
+        lastSnap(s).historyLength = typeof bad === 'function' ? bad(s) : bad;
+      }));
+    }, Engine.StoryError);
+  }
+  assert.throws(function () {
+    Engine.restoreSaveSlot(prog, corrupt(function (s) { lastSnap(s).trailLength = -3; }));
+  }, Engine.StoryError);
+  assert.throws(function () {
+    Engine.restoreSaveSlot(prog, corrupt(function (s) { lastSnap(s).choicesLength = 0.5; }));
+  }, Engine.StoryError);
+});
+
 /* ------------------------------------------------------------------ */
 /* 4. Narrative Graph & Reachability Verifier                          */
 /* ------------------------------------------------------------------ */
