@@ -1154,13 +1154,15 @@
         st.pc.ip = ins.to;
         return null;
       case 'branch':
+        if (ins.cond === null) throw new StoryError('Cannot evaluate a condition that failed to parse (line ' + ins.line + ')');
         if (!truthy(evalAst(ins.cond, envOf(st)))) st.pc.ip = ins.else;
         return null;
       case 'menu': {
         var shown = [];
         var locked = [];
         ins.choices.forEach(function (c) {
-          if (c.cond === null || truthy(evalAst(c.cond, envOf(st)))) shown.push({ index: c.index, text: c.text });
+          var brokenGuard = c.cond === null && c.guardText !== null;
+          if (!brokenGuard && (c.cond === null || truthy(evalAst(c.cond, envOf(st))))) shown.push({ index: c.index, text: c.text });
           else locked.push({ index: c.index, text: c.text, guard: c.guardText });
         });
         if (shown.length === 0) throw new StoryError('Menu at line ' + ins.line + ' has no available choices');

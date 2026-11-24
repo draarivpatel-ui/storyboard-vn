@@ -326,6 +326,50 @@ test('Runtime: evaluates if / elif / else and all assignment operators', functio
   assert.equal(ev.vars.x, 4);
 });
 
+test('Runtime: malformed if condition surfaces a story error, never an uncaught TypeError', function () {
+  const src = [
+    'label start:',
+    '    if 1 + :',
+    '        "Broken branch"',
+    '    else:',
+    '        "Else branch"',
+    '    return'
+  ].join('\n');
+  const prog = Engine.parseRenpyScript(src);
+  assert.ok(prog.diagnostics.some(function (d) { return /Bad condition/.test(d.message); }));
+  const rt = Engine.createStoryRuntime(prog);
+  const ev = Engine.advanceStory(rt);
+  assert.equal(ev.type, 'error');
+  assert.ok(/failed to parse/.test(ev.message));
+  const audit = Engine.auditScript(src);
+  assert.equal(audit.ok, false);
+  assert.ok(audit.analysis.issues.some(function (i) { return i.code === 'runtime-error'; }));
+});
+
+test('Runtime: malformed menu guard locks the choice instead of offering it', function () {
+  const src = [
+    'label start:',
+    '    menu:',
+    '        "Broken pick" if 1 + :',
+    '            jump ending_bad',
+    '        "Safe pick":',
+    '            jump ending_good',
+    'label ending_bad:',
+    '    "Bad"',
+    '    return',
+    'label ending_good:',
+    '    "Good"',
+    '    return'
+  ].join('\n');
+  const prog = Engine.parseRenpyScript(src);
+  assert.ok(prog.diagnostics.some(function (d) { return /Bad condition/.test(d.message); }));
+  const rt = Engine.createStoryRuntime(prog);
+  const ev = Engine.advanceStory(rt);
+  assert.equal(ev.type, 'menu');
+  assert.deepEqual(ev.choices.map(function (c) { return c.text; }), ['Safe pick']);
+  assert.deepEqual(ev.locked.map(function (c) { return c.text; }), ['Broken pick']);
+});
+
 test('Runtime: supports call and return subroutine stack', function () {
   const src = [
     'default calls = 0',
