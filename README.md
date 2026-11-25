@@ -49,7 +49,7 @@ Requires Node.js 18+:
 npm test
 ```
 
-This runs 520 unit and DOM smoke tests (`tests/engine.test.js`, `tests/dom-smoke.test.js`, and `tests/narrative-lab.test.js`) via `node --test`.
+This runs 523 unit and DOM smoke tests (`tests/engine.test.js`, `tests/dom-smoke.test.js`, and `tests/narrative-lab.test.js`) via `node --test`.
 
 ### 2. Play in a browser
 
