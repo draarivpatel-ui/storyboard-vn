@@ -575,6 +575,25 @@ test('Runtime: restoreSaveSlot rejects out-of-range history counters as damaged 
   }, Engine.StoryError);
 });
 
+test('Runtime: restoreSaveSlot rejects a non-integer or out-of-range instruction pointer', function () {
+  const prog = Engine.parseRenpyScript(CANONICAL_SOURCE);
+  const rt = Engine.createStoryRuntime(prog);
+  Engine.advanceStory(rt);
+  const good = Engine.serializeSaveSlot(rt, { slot: 1 });
+  const corrupt = function (mutate) {
+    const s = JSON.parse(JSON.stringify(good));
+    mutate(s);
+    return s;
+  };
+  const lastSnap = function (s) { return s.checkpoints[s.checkpoints.length - 1]; };
+
+  for (const bad of [-1, 1.5, NaN, Infinity, 'x', null, 1000000000]) {
+    assert.throws(function () {
+      Engine.restoreSaveSlot(prog, corrupt(function (s) { lastSnap(s).pc.ip = bad; }));
+    }, Engine.StoryError, 'pc.ip=' + String(bad) + ' should be rejected as a StoryError');
+  }
+});
+
 /* ------------------------------------------------------------------ */
 /* 4. Narrative Graph & Reachability Verifier                          */
 /* ------------------------------------------------------------------ */

@@ -1327,6 +1327,12 @@
           !has(program.labels, snap.pc.label)) {
         throw new StoryError('This save refers to a label that is not in the script');
       }
+      // A tampered instruction pointer must fail closed here, not throw a raw
+      // TypeError out of stepOnce when the restored runtime next advances.
+      var code = program.labels[snap.pc.label].code;
+      if (!Number.isSafeInteger(snap.pc.ip) || snap.pc.ip < 0 || snap.pc.ip > code.length) {
+        throw new StoryError('This save slot is damaged');
+      }
       if (!Array.isArray(snap.stack) ||
           !snap.vars || typeof snap.vars !== 'object' || Array.isArray(snap.vars) ||
           !snap.stage || typeof snap.stage !== 'object' || Array.isArray(snap.stage)) {
