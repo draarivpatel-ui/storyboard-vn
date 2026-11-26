@@ -908,8 +908,12 @@
   /* ------------------------------------------------------------------ */
 
   function csvEscape(value) {
-    var s = value === null || value === undefined ? '' : String(value);
-    if (/^[\t\r ]/.test(s) || /^[=+\-@]/.test(s)) {
+    if (value === null || value === undefined) return '';
+    if (typeof value === 'number') return Number.isFinite(value) ? String(value) : '';
+    var s = String(value);
+    var lead = (s.match(/^[\s\p{Cc}\p{Cf}\u00ad\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufe00-\ufe0f\ufeff]*/u) || [''])[0];
+    var rest = s.slice(lead.length);
+    if (lead.length > 0 || /^[=+\-@]/.test(rest)) {
       s = "'" + s;
     }
     if (/[",\n\r]/.test(s)) {
